@@ -1,0 +1,16 @@
+{"kind":"header","protocol":"mgp/1.1","source":{"id":"demo:fictional","platform":"example","scope":"示例数据","completeness":"partial","exported_at":"2026-01-01T00:00:00Z"}}
+{"kind":"node","value":{"id":"demo:project:galaxy","label":"记忆星盘","type":"project","content":"通过开放数据协议呈现任意来源的记忆。","state":"confirmed"}}
+{"kind":"node","value":{"id":"demo:topic:graph","label":"知识图谱","type":"topic","content":"以节点和关系表示知识。","state":"confirmed"}}
+{"kind":"node","value":{"id":"demo:topic:protocol","label":"统一协议","type":"topic","content":"让各平台自行生成结构化 JSON。","state":"confirmed"}}
+{"kind":"node","value":{"id":"demo:skill:javascript","label":"JavaScript","type":"skill","content":"使用原生 JavaScript 和 Canvas 绘制交互星图。","state":"confirmed"}}
+{"kind":"node","value":{"id":"demo:topic:import","label":"复制粘贴导入","type":"topic","state":"confirmed"}}
+{"kind":"node","value":{"id":"demo:topic:traceability","label":"来源可追溯","type":"topic","state":"confirmed"}}
+{"kind":"node","value":{"id":"demo:goal:privacy","label":"隐私优先","type":"goal","state":"confirmed"}}
+{"kind":"node","value":{"id":"demo:topic:offline","label":"离线运行","type":"topic","state":"confirmed"}}
+{"kind":"edge","value":{"from":"demo:project:galaxy","to":"demo:topic:graph","type":"uses","basis":"explicit"}}
+{"kind":"edge","value":{"from":"demo:project:galaxy","to":"demo:topic:protocol","type":"uses","basis":"explicit"}}
+{"kind":"edge","value":{"from":"demo:topic:protocol","to":"demo:topic:import","type":"enables","basis":"explicit"}}
+{"kind":"edge","value":{"from":"demo:topic:protocol","to":"demo:topic:traceability","type":"supports","basis":"explicit"}}
+{"kind":"edge","value":{"from":"demo:project:galaxy","to":"demo:skill:javascript","type":"implemented_with","basis":"explicit"}}
+{"kind":"edge","value":{"from":"demo:goal:privacy","to":"demo:topic:offline","type":"supports","basis":"explicit"}}
+{"kind":"edge","value":{"from":"demo:project:galaxy","to":"demo:goal:privacy","type":"prioritizes","basis":"explicit"}}

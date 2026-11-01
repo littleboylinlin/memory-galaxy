@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Memory Galaxy | 记忆星盘</title>
+<link rel="stylesheet" href="./import.css">
 <style>
 :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;color:#e5eafa;background:#060915;font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #8fbdff;outline-offset:2px}button:disabled{opacity:.45;cursor:not-allowed}
 .app{display:grid;grid-template-columns:350px minmax(0,1fr);height:100dvh;min-height:560px}
@@ -42,17 +44,18 @@ canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}canvas
 <div class="app">
 <aside class="sidebar">
   <div class="logo"><div class="logo-icon">✦</div><h1>Memory Galaxy</h1></div>
-  <div class="muted small">MGP 1.0 · 本地运行</div>
+  <div class="muted small">MGP 1.1 · 本地运行</div>
   <p class="intro muted">把记忆与关系整理成可以探索的星图，支持多个来源的增量导入。</p>
   <div class="stats"><div class="stat"><strong id="nodeCount">0</strong><span>星体 / 节点</span></div><div class="stat"><strong id="edgeCount">0</strong><span>关系 / 连线</span></div><div class="stat"><strong id="sourceCount">0</strong><span>数据源</span></div></div>
   <div class="section-title">导入记忆</div>
   <div class="actions"><button class="btn" id="copyPrompt">✦ 复制导出提示词</button><button class="btn" id="chooseFile">⇧ 导入文件</button></div>
-  <input type="file" id="fileInput" accept=".json,application/json">
+  <input type="file" id="fileInput" accept=".json,.jsonl,.ndjson,application/json" aria-label="选择记忆文件">
   <p class="small muted">复制导出提示词，向 AI 获取标准 JSON，或直接导入已有的 JSON 文件。</p>
-  <textarea id="input" class="field" spellcheck="false" placeholder='粘贴 {"protocol":"mgp/1.0", ...} ...'></textarea>
-  <div class="actions" style="margin-top:9px"><button class="btn primary" id="importBtn">导入并合并</button><button class="btn ghost" id="resetBtn">示例重置</button></div>
+  <label for="input" class="small muted">MGP JSON / JSONL</label>
+  <textarea id="input" class="field" spellcheck="false" placeholder='粘贴 {"protocol":"mgp/1.1", ...} ...'></textarea>
+  <div class="actions" style="margin-top:9px"><button class="btn primary" id="importBtn">预览导入</button><button class="btn ghost" id="resetBtn">示例重置</button></div>
   <div id="notice" class="notice" role="status">当前显示示例星图，导入 JSON 即可添加自己的记忆。</div>
-  <div class="section-title">查找记忆</div>
+  <label class="section-title" for="search" style="display:block">查找记忆</label>
   <input class="field" id="search" placeholder="搜索标题、内容、类型、标签…">
   <div class="section-title">分类筛选</div>
   <div class="filter" id="filters"></div>
@@ -65,9 +68,39 @@ canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}canvas
   <div class="topbar"><div><div class="heading">✧ MEMORY CONSTELLATION</div><div class="subheading" id="coverage">覆盖范围：仅演示数据</div></div><div class="top-right">滚轮缩放 · 拖拽平移 · 点击星星</div></div>
   <section class="inspector" id="inspector" aria-live="polite"><button class="close" id="closeInspector" title="关闭">×</button><span class="badge" id="detailType"></span><h2 id="detailTitle"></h2><p id="detailContent"></p><div class="meta" id="detailMeta"></div><div class="meta" id="detailLinks"></div></section>
   <div class="footer">本地渲染 · 关系来自导入数据</div>
-  <div class="drop" id="drop">释放 JSON 文件导入星图 ✦</div>
+  <div class="drop" id="drop">释放 JSON / JSONL 文件，预览导入 ✦</div>
 </main>
 </div>
+<dialog id="importDialog" aria-labelledby="importTitle" aria-describedby="importDescription">
+  <header class="import-heading"><div><h2 id="importTitle">预览记忆导入</h2><p id="importDescription">先校验，再处理冲突。点击确认前，当前图谱不会改变。</p></div><button type="button" class="close" id="closeImport" aria-label="关闭导入预览">×</button></header>
+  <div class="import-body">
+    <section class="import-editor" aria-label="导入内容">
+      <div id="importOrigin" class="import-origin"></div>
+      <label for="importText">完整批次内容</label><textarea class="field" id="importText" spellcheck="false" placeholder="粘贴 MGP JSON 或 JSONL"></textarea>
+      <p class="small muted">支持 MGP 1.0 / 1.1，单批不超过 12 MiB。JSONL 使用一条 header 记录与逐行的 node / edge 记录。</p>
+      <button type="button" class="btn" id="analyzeImport">重新校验</button>
+      <p class="small muted">缺少的节点不会被自动删除。只有带删除记录、并经你确认的操作才会移除数据。</p>
+    </section>
+    <section class="import-preview" aria-label="导入差异预览">
+      <div id="importPreview" hidden>
+        <span class="preview-format" id="previewFormat"></span>
+        <p class="preview-demo" id="previewDemo">当前浏览的是示例。确认后将从空白工作区导入，示例不会混入你的记忆。</p>
+        <h3>拟应用的变化</h3><div class="preview-stats" id="previewSummary"></div><p id="previewTotals" class="small muted"></p>
+        <h3>本批来源与覆盖声明</h3><ul class="preview-sources" id="previewSources"></ul><ul class="preview-warnings" id="previewWarnings" hidden></ul>
+        <details class="record-disclosure"><summary id="recordCount">查看本批记录</summary><ul class="preview-records" id="previewRecords"></ul></details>
+        <section id="conflictSection" hidden>
+          <h3 id="conflictCount">冲突处理</h3>
+          <label for="conflictPolicy" class="conflict-policy">批量处理策略<select id="conflictPolicy"><option value="review">逐项确认</option><option value="keep">全部保留当前</option><option value="incoming">全部采用导入</option><option value="newer">采用较新版本（无法比较时仍需确认）</option></select></label>
+          <p class="small muted">同一来源的 revision 优先，其次比较带时区的更新时间；不同来源不会比较 revision。时间缺失或相同不会猜测。</p>
+          <div id="previewConflicts"></div>
+          <div class="conflict-pagination"><button type="button" class="btn ghost" id="conflictPrevious">上一页</button><span id="conflictPage"></span><button type="button" class="btn ghost" id="conflictNext">下一页</button></div>
+        </section>
+      </div>
+    </section>
+  </div>
+  <div id="importStatus" class="notice import-status" role="status" aria-live="polite">等待校验。</div><ul id="importErrors" class="import-errors" aria-label="校验错误" hidden></ul>
+  <footer class="import-footer"><p class="small import-privacy">仅在本地处理，内容不会发送给模型或外部服务。</p><button type="button" class="btn ghost" id="cancelImport">取消</button><button type="button" class="btn primary" id="applyImport" disabled>确认导入</button></footer>
+</dialog>
 <script type="module" src="./app.mjs"></script>
 </body>
 </html>

@@ -1,0 +1,347 @@
+#importDialog {
+  width: min(1050px, calc(100vw - 28px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  color: #e5eafa;
+  background: #0d1425;
+  border: 1px solid #425675;
+  border-radius: 18px;
+  box-shadow: 0 24px 100px #000a;
+  overflow: auto;
+}
+#importDialog::backdrop {
+  background: #020611c9;
+  backdrop-filter: blur(5px);
+}
+#importDialog [hidden] {
+  display: none !important;
+}
+.import-heading {
+  padding: 22px 25px;
+  border-bottom: 1px solid #2b3852;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+}
+.import-heading h2 {
+  font-size: 21px;
+  margin: 0 0 7px;
+}
+.import-heading p {
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.6;
+  color: #aab8d1;
+}
+.import-heading .close {
+  float: none;
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid #354765;
+  border-radius: 9px;
+}
+.import-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 1.15fr);
+  gap: 22px;
+  padding: 22px 25px;
+}
+.import-editor label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.import-editor textarea {
+  height: 340px;
+  max-height: 50dvh;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+.import-origin {
+  color: #abc7ee;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin-bottom: 10px;
+}
+.import-editor .btn {
+  margin-top: 10px;
+}
+.import-editor .small {
+  margin: 10px 0;
+}
+.import-preview {
+  min-width: 0;
+}
+.import-preview h3 {
+  font-size: 14px;
+  margin: 20px 0 10px;
+}
+.import-preview h3:first-child {
+  margin-top: 0;
+}
+.preview-format {
+  display: inline-block;
+  border: 1px solid #456082;
+  border-radius: 7px;
+  padding: 5px 9px;
+  color: #b8d8ff;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.preview-demo {
+  color: #f2cb84;
+  background: #302919;
+  border: 1px solid #6b5836;
+  padding: 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.preview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.preview-stat {
+  border: 1px solid #2b3b59;
+  border-radius: 10px;
+  background: #141e32;
+  padding: 10px;
+}
+.preview-stat strong {
+  display: block;
+  font-size: 20px;
+}
+.preview-stat span {
+  font-size: 11px;
+  color: #b3c1d8;
+}
+.preview-sources,
+.preview-warnings,
+.preview-records,
+.import-errors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+.preview-sources li {
+  font-size: 12px;
+  line-height: 1.7;
+  border-bottom: 1px solid #27344b;
+  padding: 8px 0;
+}
+.preview-sources p {
+  margin: 4px 0;
+  white-space: pre-wrap;
+}
+.preview-warnings {
+  padding: 10px;
+  border: 1px solid #6b5836;
+  border-radius: 9px;
+  color: #f2cb84;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+.preview-warnings li + li {
+  margin-top: 6px;
+}
+.preview-records {
+  max-height: 250px;
+  overflow: auto;
+}
+.preview-record {
+  padding: 10px 0;
+  border-bottom: 1px solid #27344b;
+  font-size: 12px;
+}
+.preview-record p {
+  white-space: pre-wrap;
+  margin: 6px 0;
+  line-height: 1.6;
+  color: #b8c7df;
+}
+.record-disclosure {
+  font-size: 13px;
+  padding: 12px 0;
+}
+.record-disclosure > summary {
+  cursor: pointer;
+  color: #b8d8ff;
+}
+.import-placeholder {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #aab8d1;
+  padding: 20px 0;
+}
+.import-status {
+  margin: 0 25px 16px;
+  line-height: 1.6;
+}
+.import-errors {
+  max-height: 270px;
+  overflow: auto;
+  padding: 0 25px 15px;
+}
+.import-errors li + li {
+  margin-top: 6px;
+}
+.issue-location {
+  border: 1px solid #744552;
+  background: #2b1a29;
+  color: #ffd2da;
+  text-align: left;
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.conflict-policy {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  color: #b9c8e0;
+  margin-bottom: 12px;
+}
+select {
+  background: #0a1226;
+  border: 1px solid #465c80;
+  color: #e5eafa;
+  border-radius: 8px;
+  padding: 9px;
+  max-width: 100%;
+  font: inherit;
+}
+.conflict-card {
+  border: 1px solid #465572;
+  background: #141d30;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 10px;
+}
+.conflict-card h4 {
+  font-size: 12px;
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+.conflict-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.conflict-comparison details {
+  min-width: 0;
+  font-size: 11px;
+}
+.conflict-comparison summary {
+  cursor: pointer;
+  color: #b9c8e0;
+}
+.conflict-comparison pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow: auto;
+  color: #c5d7f1;
+  font-size: 11px;
+  line-height: 1.6;
+  background: #080f1f;
+  border-radius: 7px;
+  padding: 8px;
+}
+.conflict-card label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  margin-top: 9px;
+}
+.conflict-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-top: 10px;
+}
+.conflict-pagination button {
+  min-height: 38px;
+}
+.import-footer {
+  padding: 15px 25px;
+  border-top: 1px solid #2b3852;
+  background: #101a2d;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+.import-footer .btn {
+  min-height: 42px;
+}
+.import-footer .small {
+  margin-right: auto;
+  color: #aab8d1;
+}
+.import-footer .primary {
+  white-space: nowrap;
+}
+#importText:focus-visible {
+  outline-offset: 2px;
+}
+.import-privacy {
+  max-width: 460px;
+}
+@media (max-width: 760px) {
+  #importDialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 12px;
+  }
+  .import-body {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
+  }
+  .import-heading {
+    padding: 17px 16px;
+  }
+  .import-editor textarea {
+    height: 200px;
+    max-height: 35dvh;
+  }
+  .import-status {
+    margin: 0 16px 12px;
+  }
+  .import-errors {
+    padding: 0 16px 12px;
+  }
+  .import-footer {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .import-footer .small {
+    flex-basis: 100%;
+    margin-bottom: 0;
+  }
+  .import-footer .btn {
+    flex: 1;
+  }
+  .conflict-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #importDialog::backdrop {
+    backdrop-filter: none;
+  }
+}

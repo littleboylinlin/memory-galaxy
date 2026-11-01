@@ -1,86 +1,177 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Memory Graph Protocol 1.0",
-  "type": "object",
-  "required": [
-    "protocol",
-    "source",
-    "nodes",
-    "edges"
-  ],
-  "properties": {
-    "protocol": {
-      "const": "mgp/1.0"
+  "title": "Memory Graph Protocol 1.1 (1.0 compatible)",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["protocol", "source", "nodes", "edges"],
+      "properties": {
+        "protocol": {
+          "const": "mgp/1.1"
+        },
+        "mode": {
+          "enum": ["snapshot", "delta"]
+        },
+        "batch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "maxItems": 50000,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "maxItems": 250000,
+          "items": {
+            "$ref": "#/$defs/edge"
+          }
+        },
+        "deleted": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "maxItems": 50000,
+              "items": {
+                "$ref": "#/$defs/deletedNode"
+              }
+            },
+            "edges": {
+              "type": "array",
+              "maxItems": 250000,
+              "items": {
+                "$ref": "#/$defs/deletedEdge"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": false
     },
-    "source": {
-      "$ref": "#/$defs/source"
-    },
-    "sources": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/source"
-      }
-    },
-    "nodes": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/node"
-      }
-    },
-    "edges": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/edge"
+    {
+      "type": "object",
+      "required": ["protocol", "source", "nodes", "edges"],
+      "properties": {
+        "protocol": {
+          "const": "mgp/1.0"
+        },
+        "mode": {
+          "const": "snapshot"
+        },
+        "batch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "source": {
+          "$ref": "#/$defs/legacySource"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/legacySource"
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "maxItems": 50000,
+          "items": {
+            "$ref": "#/$defs/legacyNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "maxItems": 250000,
+          "items": {
+            "$ref": "#/$defs/legacyEdge"
+          }
+        },
+        "deleted": false,
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      },
+      "propertyNames": {
+        "not": {
+          "enum": ["__proto__", "constructor", "prototype"]
+        }
       }
     }
-  },
+  ],
   "$defs": {
     "source": {
       "type": "object",
-      "required": [
-        "id"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "platform": {
-          "type": "string"
-        },
-        "scope": {
-          "type": "string"
-        },
-        "completeness": {
-          "enum": [
-            "full",
-            "partial",
-            "unknown"
-          ]
-        },
-        "exported_at": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "node": {
-      "type": "object",
-      "required": [
-        "id",
-        "label",
-        "type"
-      ],
+      "required": ["id"],
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "platform": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "scope": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "completeness": {
+          "enum": ["full", "partial", "unknown"]
+        },
+        "exported_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "label", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
         },
         "label": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 200
+          "maxLength": 200,
+          "pattern": "\\S"
         },
         "type": {
           "enum": [
@@ -101,61 +192,464 @@
         },
         "tags": {
           "type": "array",
+          "maxItems": 100,
           "items": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "\\S"
           }
         },
         "state": {
-          "enum": [
-            "confirmed",
-            "inferred",
-            "deprecated",
-            "disputed",
-            "unknown"
-          ]
+          "enum": ["confirmed", "inferred", "deprecated", "disputed", "unknown"]
         },
         "sensitive": {
           "type": "boolean"
         },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
         "source_ref": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 2000
+        },
+        "provenance": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/provenance"
+          }
         },
         "updated_at": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "edge": {
       "type": "object",
-      "required": [
-        "from",
-        "to",
-        "type",
-        "basis"
-      ],
+      "required": ["from", "to", "type", "basis"],
       "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
         "from": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
         },
         "to": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
         },
         "type": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
         },
         "basis": {
-          "enum": [
-            "explicit",
-            "inferred",
-            "rule"
-          ]
+          "enum": ["explicit", "inferred", "rule"]
         },
         "evidence": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "source_ref": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "provenance": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["source_id"],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "ref": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "deletedNode": {
+      "type": "object",
+      "required": ["id", "deleted_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "deleted_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "source_ref": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "deletedEdge": {
+      "type": "object",
+      "required": ["deleted_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "deleted_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "source_ref": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["id"],
+          "properties": {
+            "id": {}
+          }
+        },
+        {
+          "required": ["from", "to", "type"],
+          "properties": {
+            "from": {},
+            "to": {},
+            "type": {}
+          }
+        }
+      ]
+    },
+    "jsonValue": {
+      "anyOf": [
+        {
           "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        },
+        {
+          "$ref": "#/$defs/extensions"
+        }
+      ]
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "enum": ["__proto__", "constructor", "prototype"]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      }
+    },
+    "legacySource": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "platform": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "scope": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "completeness": {
+          "enum": ["full", "partial", "unknown"]
+        },
+        "exported_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      },
+      "propertyNames": {
+        "not": {
+          "enum": ["__proto__", "constructor", "prototype"]
+        }
+      }
+    },
+    "legacyNode": {
+      "type": "object",
+      "required": ["id", "label", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "\\S"
+        },
+        "type": {
+          "enum": [
+            "memory",
+            "person",
+            "project",
+            "topic",
+            "event",
+            "preference",
+            "goal",
+            "skill",
+            "other"
+          ]
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "tags": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "\\S"
+          }
+        },
+        "state": {
+          "enum": ["confirmed", "inferred", "deprecated", "disputed", "unknown"]
+        },
+        "sensitive": {
+          "type": "boolean"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "source_ref": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "provenance": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      },
+      "propertyNames": {
+        "not": {
+          "enum": ["__proto__", "constructor", "prototype"]
+        }
+      }
+    },
+    "legacyEdge": {
+      "type": "object",
+      "required": ["from", "to", "type", "basis"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "basis": {
+          "enum": ["explicit", "inferred", "rule"]
+        },
+        "evidence": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!.*[\\u0000-\\u001f]).*\\S.*$"
+        },
+        "source_ref": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "provenance": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:[0-5]\\d(?:\\.\\d{1,9})?(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      },
+      "propertyNames": {
+        "not": {
+          "enum": ["__proto__", "constructor", "prototype"]
         }
       }
     }
