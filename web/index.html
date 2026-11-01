@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory Galaxy | 记忆星盘协议演示</title>
+<style>
+:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;color:#e5eafa;background:#060915;font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #8fbdff;outline-offset:2px}button:disabled{opacity:.45;cursor:not-allowed}
+.app{display:grid;grid-template-columns:350px minmax(0,1fr);height:100dvh;min-height:560px}
+.sidebar{padding:24px 19px;overflow:auto;border-right:1px solid #26304b;background:linear-gradient(145deg,#10172b,#080d19 80%)}
+.logo{display:flex;align-items:center;gap:12px;margin-bottom:7px}
+.logo-icon{display:grid;place-items:center;border-radius:14px;width:42px;height:42px;background:#1c2d55;color:#c9dcff;font-size:27px}
+.logo h1{font-size:20px;letter-spacing:.4px;margin:0}.muted{color:#96a2bd}.small{font-size:12px;line-height:1.65}
+.intro{font-size:13px;line-height:1.7;margin:10px 0 22px}
+.section-title{font-size:11px;text-transform:uppercase;color:#8a9cbe;letter-spacing:2px;margin:23px 0 10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.stat{background:#141e34;border:1px solid #293551;padding:10px;border-radius:12px}
+.stat strong{display:block;font-size:22px;color:#dceaff}.stat span{font-size:11px;color:#91a4c6}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#182543;border:1px solid #354765;color:#d7e5ff;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;transition:background .18s}
+.btn:hover{background:#24345b}.btn.primary{background:#6389e5;border-color:#6389e5;color:#061125}.btn.primary:hover{background:#80a2f7}.btn.ghost{background:transparent}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1}
+.field{width:100%;border:1px solid #354361;background:#0a1226;color:#f0f3ff;border-radius:10px;padding:12px;font-size:13px}
+.field::placeholder{color:#7887a7}textarea.field{height:155px;resize:vertical;line-height:1.55}
+input[type=file]{display:none}.notice{margin-top:12px;background:#13223a;border:1px solid #335270;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.6;color:#bdccdf;white-space:pre-wrap}
+.notice.error{border-color:#98576b;background:#2b1a2b;color:#ffc8d0}
+.filter{display:flex;flex-wrap:wrap;gap:6px}.chip{border:1px solid #33405e;background:#111b32;color:#a6b4d1;padding:6px 10px;border-radius:99px;font-size:11px}.chip.active{background:#31508a;border-color:#557cbb;color:#fff}
+.main{position:relative;overflow:hidden;background:radial-gradient(ellipse at 43% 47%,#162446 0%,#0a1127 46%,#040817 100%)}
+canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}canvas.grabbing{cursor:grabbing}
+.topbar{pointer-events:none;position:absolute;top:22px;left:26px;right:22px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.heading{font-size:15px;font-weight:700;letter-spacing:.6px}.subheading{font-size:11px;color:#97aacb;margin-top:4px}
+.top-right{pointer-events:auto;background:#0c1428a8;border:1px solid #334468;border-radius:9px;padding:8px 11px;color:#b6c3df;font-size:11px}
+.inspector{position:absolute;bottom:24px;right:24px;width:min(335px,calc(100% - 36px));padding:19px;border:1px solid #50689e;background:#111b31f5;border-radius:17px;box-shadow:0 10px 45px #0009;display:none}.inspector.visible{display:block}
+.inspector h2{font-size:18px;margin:8px 0}.inspector p{font-size:13px;line-height:1.7;color:#cfdbf1;max-height:170px;overflow:auto;white-space:pre-wrap}
+.inspector .meta{font-size:11px;color:#a8bbd8;margin-top:9px;overflow-wrap:anywhere}
+.close{float:right;background:transparent;border:none;color:#bbcdf0;font-size:18px}
+.badge{display:inline-block;border:1px solid #425981;border-radius:8px;padding:4px 8px;color:#abc7ee;font-size:11px}
+.footer{position:absolute;bottom:19px;left:26px;color:#8093b5;font-size:11px;pointer-events:none}
+.drop{position:absolute;inset:13px;border:2px dashed #8cafed;border-radius:20px;background:#1d325cdd;z-index:7;display:none;place-items:center;font-size:23px;font-weight:700;pointer-events:none}.drop.active{display:grid}
+@media(max-width:800px){.app{display:flex;flex-direction:column;height:auto;min-height:100dvh}.sidebar{order:2;border-right:none;border-top:1px solid #26304b}.main{order:1;height:62vh;min-height:360px}.inspector{bottom:42px;right:12px}.topbar{top:14px;left:15px;right:15px}.footer{left:14px;bottom:12px}.top-right{font-size:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="logo"><div class="logo-icon">✦</div><h1>Memory Galaxy</h1></div>
+  <div class="muted small">MGP 1.0 · 纯协议驱动 · 本地运行</div>
+  <p class="intro muted">一条记忆一颗星，一条关系一条连线。AI 负责生成标准 JSON，星盘负责校验和显示。</p>
+  <div class="stats"><div class="stat"><strong id="nodeCount">0</strong><span>星体 / 节点</span></div><div class="stat"><strong id="edgeCount">0</strong><span>关系 / 连线</span></div><div class="stat"><strong id="sourceCount">0</strong><span>数据源</span></div></div>
+  <div class="section-title">跨 AI 导入</div>
+  <div class="actions"><button class="btn" id="copyPrompt">✦ 复制导出提示词</button><button class="btn" id="chooseFile">⇧ 导入文件</button></div>
+  <input type="file" id="fileInput" accept=".json,application/json">
+  <p class="small muted">把提示词发给任何 AI，再将它输出的标准 JSON 粘贴回来。星盘本身不使用 API。</p>
+  <textarea id="input" class="field" spellcheck="false" placeholder='粘贴 {"protocol":"mgp/1.0", ...} ...'></textarea>
+  <div class="actions" style="margin-top:9px"><button class="btn primary" id="importBtn">导入并合并</button><button class="btn ghost" id="resetBtn">示例重置</button></div>
+  <div id="notice" class="notice" role="status">当前显示虚构演示数据，没有读取任何真实个人记忆。</div>
+  <div class="section-title">查找记忆</div>
+  <input class="field" id="search" placeholder="搜索标题、内容、类型、标签…">
+  <div class="section-title">分类筛选</div>
+  <div class="filter" id="filters"></div>
+  <div class="section-title">数据管理</div>
+  <div class="actions"><button class="btn" id="exportBtn">↓ 导出星盘 JSON</button><button class="btn" id="saveBtn">◈ 保存到本机</button><button class="btn" id="clearSaveBtn">清除缓存</button></div>
+  <p class="small muted">默认仅在当前页面内存中处理；只有点击「保存到本机」才会写入浏览器 localStorage。请勿把私人记忆上传到不信任的网站。</p>
+</aside>
+<main class="main" id="viewport">
+  <canvas id="sky" aria-label="可拖动缩放的记忆关系星图"></canvas>
+  <div class="topbar"><div><div class="heading">✧ MEMORY CONSTELLATION</div><div class="subheading" id="coverage">覆盖范围：仅演示数据</div></div><div class="top-right">滚轮缩放 · 拖拽平移 · 点击星星</div></div>
+  <section class="inspector" id="inspector" aria-live="polite"><button class="close" id="closeInspector" title="关闭">×</button><span class="badge" id="detailType"></span><h2 id="detailTitle"></h2><p id="detailContent"></p><div class="meta" id="detailMeta"></div><div class="meta" id="detailLinks"></div></section>
+  <div class="footer">本地渲染 · 非 AI 推断的关系 · 无网络上传</div>
+  <div class="drop" id="drop">释放 JSON 文件导入星图 ✦</div>
+</main>
+</div>
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>
