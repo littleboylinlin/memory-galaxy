@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Memory Graph Protocol 1.0",
+  "type": "object",
+  "required": [
+    "protocol",
+    "source",
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "mgp/1.0"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "completeness": {
+          "enum": [
+            "full",
+            "partial",
+            "unknown"
+          ]
+        },
+        "exported_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "type": {
+          "enum": [
+            "memory",
+            "person",
+            "project",
+            "topic",
+            "event",
+            "preference",
+            "goal",
+            "skill",
+            "other"
+          ]
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state": {
+          "enum": [
+            "confirmed",
+            "inferred",
+            "deprecated",
+            "disputed",
+            "unknown"
+          ]
+        },
+        "sensitive": {
+          "type": "boolean"
+        },
+        "source_ref": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": [
+        "from",
+        "to",
+        "type",
+        "basis"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "enum": [
+            "explicit",
+            "inferred",
+            "rule"
+          ]
+        },
+        "evidence": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
