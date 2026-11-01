@@ -1,5 +1,5 @@
 {
-  "protocol": "mgp/1.0",
+  "protocol": "mgp/1.1",
   "source": {
     "id": "demo:fictional",
     "platform": "example",

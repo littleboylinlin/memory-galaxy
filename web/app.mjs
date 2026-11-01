@@ -1,25 +1,27 @@
-import {example,parseMgp,mergeMgp,validateMgp} from './mgp.mjs';
-import {promptText} from './prompt.mjs';
+import {example,validateMgp,graphSources,isExampleGraph} from './mgp.mjs';
+import {loadExportPrompt} from './prompt.mjs';
+import {ImportUi} from './import-ui.mjs';
 const $=id=>document.getElementById(id);
 const canvas=$('sky'),ctx=canvas.getContext('2d');
 const palette={memory:'#9daeff',person:'#fca4d0',project:'#f4c477',topic:'#77c9ff',event:'#ff99ab',preference:'#ffb98e',goal:'#cfb5ff',skill:'#78e2cb',other:'#bbc7df'};
 const names={memory:'记忆',person:'人物',project:'项目',topic:'主题',event:'事件',preference:'偏好',goal:'目标',skill:'技能',other:'其他'};
 const cats=Object.keys(names);
 let graph=structuredClone(example),stars=[],segments=[],selected=null,filter='all',search='',zoom=1,pan={x:0,y:0},drag=null,ticks=0,dirty=true;
+let isDemo=true,graphRevision=0;
 const hash=s=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
 const rnd=s=>(hash(s)%100000)/100000;
 const color=t=>palette[t]||palette.other;
 const warn=(msg,err=false)=>{const el=$('notice');el.textContent=msg;el.classList.toggle('error',err)};
 function setGraph(g){
- graph=g;stars=graph.nodes.map(n=>{const a=rnd(n.id+'a')*Math.PI*2,cat=cats.indexOf(n.type),seed=rnd(n.id+'r');const cx=Math.cos(cat*2.399)*140,cy=Math.sin(cat*2.399)*115;return {...n,x:cx+Math.cos(a)*(55+seed*130),y:cy+Math.sin(a)*(55+seed*130),vx:0,vy:0}});
+ graph=g;graphRevision++;stars=graph.nodes.map(n=>{const a=rnd(n.id+'a')*Math.PI*2,cat=cats.indexOf(n.type),seed=rnd(n.id+'r');const cx=Math.cos(cat*2.399)*140,cy=Math.sin(cat*2.399)*115;return {...n,x:cx+Math.cos(a)*(55+seed*130),y:cy+Math.sin(a)*(55+seed*130),vx:0,vy:0}});
  const id=new Map(stars.map((n,i)=>[n.id,i]));
  segments=graph.edges.map(e=>({...e,a:id.get(e.from),b:id.get(e.to)})).filter(e=>e.a!==undefined&&e.b!==undefined);
  const degree=new Map();segments.forEach(e=>{degree.set(e.from,(degree.get(e.from)||0)+1);degree.set(e.to,(degree.get(e.to)||0)+1)});stars.forEach(s=>s.degree=degree.get(s.id)||0);
  selected=null;ticks=0;zoom=1;pan={x:0,y:0};update();fitCanvas();
 }
 function update(){
- $('nodeCount').textContent=stars.length.toLocaleString();$('edgeCount').textContent=segments.length.toLocaleString();$('sourceCount').textContent=(graph.sources?.length||1).toLocaleString();
- const src=graph.source||{};$('coverage').textContent=`覆盖范围：${src.scope||'多来源'} · ${src.completeness==='full'?'导出方声称全量（未经验证）':src.completeness==='partial'?'部分':'未知'}`;
+ $('nodeCount').textContent=stars.length.toLocaleString();$('edgeCount').textContent=segments.length.toLocaleString();$('sourceCount').textContent=graphSources(graph).length.toLocaleString();
+ $('coverage').textContent=isDemo?'覆盖范围：仅示例数据':`覆盖范围：${graphSources(graph).length} 个来源 · 声明未经独立验证`;
  renderFilters();renderDetail();dirty=true;
 }
 function renderFilters(){
@@ -73,7 +75,7 @@ function hit(x,y){let closest=null,min=17;for(const s of stars){if(!isVisible(s)
 function renderDetail(){
  const el=$('inspector');if(!selected){el.classList.remove('visible');return}
  el.classList.add('visible');$('detailTitle').textContent=selected.label;$('detailType').textContent=names[selected.type]||selected.type;$('detailContent').textContent=selected.content||'暂无正文';
- $('detailMeta').textContent=[`状态: ${selected.state||'unknown'}`,selected.source_ref&&`出处: ${selected.source_ref}`,selected.updated_at&&`更新: ${selected.updated_at}`].filter(Boolean).join('  ·  ');
+ $('detailMeta').textContent=[`状态: ${selected.state||'unknown'}`,selected.source_ref&&`出处: ${selected.source_ref}`,selected.provenance?.length&&`来源: ${selected.provenance.map(p=>p.source_id+(p.ref?' ['+p.ref+']':'')).join('，')}`,selected.updated_at&&`更新: ${selected.updated_at}`].filter(Boolean).join('  ·  ');
  const links=segments.filter(e=>e.from===selected.id||e.to===selected.id);
  $('detailLinks').textContent=links.length?`关联 (${links.length}): `+links.slice(0,25).map(e=>{const other=stars.find(s=>s.id===(e.from===selected.id?e.to:e.from));return `${other?.label||'未知'} [${e.type}, ${e.basis}]`}).join('，'):'暂无关联';
 }
@@ -85,26 +87,17 @@ canvas.addEventListener('dblclick',()=>{zoom=1;pan={x:0,y:0};dirty=true});
 $('closeInspector').onclick=()=>{selected=null;renderDetail();dirty=true};
 $('search').oninput=e=>{search=e.target.value.trim().toLowerCase();dirty=true};
 $('copyPrompt').onclick=async()=>{
- try{await navigator.clipboard.writeText(promptText);warn('导出提示词已复制。发送给 AI 后，将它输出的 JSON 粘贴到这里即可。')}
- catch{const input=$('input');input.value=promptText;input.focus();input.select();warn('浏览器拒绝读取剪贴板，已将提示词放入文本框，请手动复制。')}
-};
-function importText(text){
  try{
-  const {graph:incoming,warnings}=parseMgp(text,graph.nodes.map(n=>n.id));const merged=mergeMgp(graph,incoming);setGraph(merged);
-  warn(`导入成功：本批 ${incoming.nodes.length} 颗星、${incoming.edges.length} 条关系；累计 ${merged.nodes.length} 颗星。${warnings.length?'\n注意：'+warnings.join('；'):''}`);$('input').value='';
- }catch(e){warn('导入失败：'+e.message,true)}
-}
-$('importBtn').onclick=()=>importText($('input').value);
-$('resetBtn').onclick=()=>{setGraph(structuredClone(example));warn('已恢复虚构示例星图，未覆盖本机缓存。')};
-$('chooseFile').onclick=()=>$('fileInput').click();
-$('fileInput').onchange=async e=>{const file=e.target.files?.[0];if(file){if(file.size>12*1024*1024)warn('文件超过 12MB，请拆成多个批次。',true);else importText(await file.text());e.target.value=''}};
+  const promptText=await loadExportPrompt();
+  try{await navigator.clipboard.writeText(promptText);warn('导出提示词已复制。发送给 AI 后，将它输出的 JSON 粘贴到这里预览。')}
+  catch{const input=$('input');input.value=promptText;input.focus();input.select();warn('浏览器未允许写入剪贴板，已将提示词放入文本框，请手动复制。')}
+ }catch{warn('导出提示词加载失败，请刷新页面后重试。',true)}
+};
+new ImportUi({getGraph:()=>graph,getRevision:()=>graphRevision,isExample:()=>isDemo,onApply:g=>{isDemo=false;setGraph(g)},onNotice:warn});
+$('resetBtn').onclick=()=>{if(!isDemo&&!confirm('恢复示例会替换当前页面中的图谱。请先导出或保存需要保留的数据。继续吗？'))return;isDemo=true;setGraph(structuredClone(example));warn('已恢复示例星图，未覆盖本机缓存。')};
 function download(data,name){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('exportBtn').onclick=()=>download(graph,'memory-galaxy.mgp.json');
 $('saveBtn').onclick=()=>{try{localStorage.setItem('memory-galaxy-mgp-v1',JSON.stringify(graph));warn('已主动保存到这个浏览器的本地存储。注意：localStorage 不加密。')}catch(e){warn('保存失败：'+e.message,true)}};
-$('clearSaveBtn').onclick=()=>{localStorage.removeItem('memory-galaxy-mgp-v1');warn('已清除本地缓存。页面里的当前图谱仍然保留。')};
-const zone=$('viewport'),drop=$('drop');
-zone.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('active')});
-zone.addEventListener('dragleave',e=>{if(!zone.contains(e.relatedTarget))drop.classList.remove('active')});
-zone.addEventListener('drop',async e=>{e.preventDefault();drop.classList.remove('active');const file=e.dataTransfer?.files?.[0];if(file){if(file.size>12*1024*1024)warn('文件超过 12MB，请拆成多个批次。',true);else importText(await file.text())}});
-try{const saved=localStorage.getItem('memory-galaxy-mgp-v1');if(saved){const g=JSON.parse(saved);if(validateMgp(g).ok){graph=g;warn('已读取你此前主动保存的本地图谱。')}}}catch{warn('本地缓存格式异常，已加载示例。',true)}
+$('clearSaveBtn').onclick=()=>{try{localStorage.removeItem('memory-galaxy-mgp-v1');warn('已清除本地缓存。页面里的当前图谱仍然保留。')}catch{warn('浏览器未允许清除本地存储，当前图谱未受影响。',true)}};
+try{const saved=localStorage.getItem('memory-galaxy-mgp-v1');if(saved){const g=JSON.parse(saved);if(validateMgp(g).ok){graph=g;isDemo=isExampleGraph(g);warn('已读取你此前主动保存的本地图谱。')}else warn('旧缓存未通过校验，已保留原缓存并显示示例。',true)}}catch{warn('无法读取本地缓存，已加载示例。',true)}
 setGraph(graph);
