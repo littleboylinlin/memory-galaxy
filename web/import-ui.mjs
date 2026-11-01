@@ -24,6 +24,7 @@ const coverage = {
   unknown: "未知",
 };
 const PAGE_SIZE = 30;
+const EDITOR_SIZE = 64 * 1024;
 export class ImportUi {
   #client = new ImportClient();
   #request = 0;
@@ -33,6 +34,7 @@ export class ImportUi {
   #choices = {};
   #baseRevision;
   #page = 0;
+  #largeText = null;
   constructor({ getGraph, getRevision, isExample, onApply, onNotice }) {
     Object.assign(this, {
       getGraph,
@@ -60,6 +62,7 @@ export class ImportUi {
       if (!$("importDialog").open) this.cancelSession();
     });
     $("importText").addEventListener("input", () => {
+      this.#largeText = null;
       this.#fileRequest++;
       this.#request++;
       this.#client.cancel();
@@ -69,6 +72,14 @@ export class ImportUi {
       this.clearPreview();
       this.status("内容已修改，点击「重新校验」更新预览。");
     });
+    for (const input of [$("input"), $("importText")])
+      input.addEventListener("paste", (event) => {
+        const text = event.clipboardData?.getData("text/plain");
+        if (text && (text.length > EDITOR_SIZE || input.readOnly)) {
+          event.preventDefault();
+          this.open(text, "粘贴内容");
+        }
+      });
     $("conflictPolicy").onchange = () => {
       this.#choices = {};
       this.#page = 0;
@@ -124,6 +135,7 @@ export class ImportUi {
     this.#client.cancel();
     this.#plan = undefined;
     this.#parsed = undefined;
+    this.#largeText = null;
   }
   close() {
     this.cancelSession();
@@ -133,11 +145,28 @@ export class ImportUi {
     this.#fileRequest++;
     this.show();
     $("importOrigin").textContent = label;
-    $("importText").value = text;
+    if (text.length > LIMITS.bytes) {
+      this.#request++;
+      this.#client.cancel();
+      this.#plan = undefined;
+      this.loadText("");
+      this.clearPreview();
+      this.status("内容超过 12 MiB，请拆分为多个批次。", true);
+      return;
+    }
+    this.loadText(text);
     this.#choices = {};
     this.#page = 0;
     $("conflictPolicy").value = "review";
     this.analyze();
+  }
+  loadText(text) {
+    this.#largeText = text.length > EDITOR_SIZE ? text : null;
+    $("importText").readOnly = this.#largeText !== null;
+    $("importText").value = text.slice(0, EDITOR_SIZE);
+    $("importTextHint").hidden = this.#largeText === null;
+    $("importTextHint").textContent =
+      "大批次仅展示前 65,536 个字符，完整原文会参与校验和导入。点击错误可查看对应片段；修改请重新粘贴或选择修正后的文件。";
   }
   async openFile(file) {
     const request = ++this.#fileRequest;
@@ -147,7 +176,7 @@ export class ImportUi {
     this.#plan = undefined;
     this.clearPreview();
     $("importOrigin").textContent = file.name;
-    $("importText").value = "";
+    this.loadText("");
     if (file.size > LIMITS.bytes) {
       this.status("文件超过 12 MiB，请拆分为多个批次。", true);
       return;
@@ -164,7 +193,7 @@ export class ImportUi {
   }
   async analyze() {
     const request = ++this.#request,
-      text = $("importText").value;
+      text = this.#largeText ?? $("importText").value;
     this.#client.cancel();
     this.#plan = undefined;
     this.clearPreview();
@@ -216,14 +245,22 @@ export class ImportUi {
           const input = $("importText");
           input.focus();
           if (issue.line) {
-            const lines = input.value.replace(/^\uFEFF/, "").split("\n");
+            const source = this.#largeText ?? input.value;
+            const lines = source.replace(/^\uFEFF/, "").split("\n");
             const offset =
               lines
                 .slice(0, issue.line - 1)
                 .reduce((sum, line) => sum + line.length + 1, 0) +
               (issue.column || 1) -
-              1;
-            input.setSelectionRange(offset, offset + 1);
+              1 +
+              (source.startsWith("\uFEFF") ? 1 : 0);
+            const start = this.#largeText ? Math.max(0, offset - 2000) : 0;
+            if (this.#largeText) {
+              input.value = source.slice(start, start + EDITOR_SIZE);
+              $("importTextHint").textContent =
+                `原文第 ${start + 1}～${Math.min(source.length, start + EDITOR_SIZE)} 个字符（共 ${source.length}）。错误行列对应完整原文；请重新粘贴或选择修正后的文件以修改。`;
+            }
+            input.setSelectionRange(offset - start, offset - start + 1);
           }
         };
         item.append(button);
@@ -323,29 +360,21 @@ export class ImportUi {
     $("recordCount").textContent =
       "查看本批记录（" + total.toLocaleString() + "）";
     const records = [
-      ...nodes
-        .slice(0, 30)
-        .map((n) => ({
-          title: n.label,
-          body: n.id + " · " + n.type + (n.content ? "\n" + n.content : ""),
-        })),
-      ...edges
-        .slice(0, 30)
-        .map((e) => ({
-          title: e.from + " → " + e.to,
-          body:
-            e.type + " · " + e.basis + (e.evidence ? "\n" + e.evidence : ""),
-        })),
+      ...nodes.slice(0, 30).map((n) => ({
+        title: n.label,
+        body: n.id + " · " + n.type + (n.content ? "\n" + n.content : ""),
+      })),
+      ...edges.slice(0, 30).map((e) => ({
+        title: e.from + " → " + e.to,
+        body: e.type + " · " + e.basis + (e.evidence ? "\n" + e.evidence : ""),
+      })),
       ...(deleted?.nodes || [])
         .slice(0, 10)
         .map((d) => ({ title: "删除节点：" + d.id, body: d.deleted_at })),
-      ...(deleted?.edges || [])
-        .slice(0, 10)
-        .map((d) => ({
-          title:
-            "删除关系：" + (d.id || d.from + " → " + d.to + " · " + d.type),
-          body: d.deleted_at,
-        })),
+      ...(deleted?.edges || []).slice(0, 10).map((d) => ({
+        title: "删除关系：" + (d.id || d.from + " → " + d.to + " · " + d.type),
+        body: d.deleted_at,
+      })),
     ];
     for (const record of records) {
       const item = el("li", undefined, "preview-record");
