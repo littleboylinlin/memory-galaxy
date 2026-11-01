@@ -1,30 +1,51 @@
-# Memory Galaxy · MGP 1.0
+# Memory Galaxy · 记忆星盘
 
-开放记忆星盘原型。AI 按统一 JSON 格式输出节点与关系，星盘负责解析、校验、合并和可视化。**不需要 AI API。**
-
-这是独立开发的兼容性实验，不是已经完整 Fork 的 `R4ph3rd/not-mental-model`。上游项目是重要的架构参考，后续可接入其图谱编辑器。
+将记忆和关系整理成可以探索的星图。支持 MGP 1.0 格式的 JSON 导入、校验、增量合并和导出，使用原生 JavaScript 与 Canvas 在浏览器中运行，无需构建或配置 API。
 
 ## 使用
-直接访问 GitHub Pages（如果已启用），或者克隆并从 `web/` 启动：
+
+在仓库根目录启动本地静态服务器：
+
 ```bash
-cd web
 python -m http.server 8000
 ```
-打开 http://localhost:8000 。
+
+打开 <http://localhost:8000>。页面默认加载示例星图；可以导入自己的 JSON 文件，也可以复制页面中的导出提示词，让 AI 将可访问的记忆整理成 MGP 格式后粘贴导入。
 
 ## 功能
-- 节点 = 星星，关系 = 连线，力导向布局、拖动平移、滚轮缩放、点击查看内容
-- JSON 粘贴/文件导入、按 id 去重、增量合并与导出
-- 中文通用导出提示词，一键复制给其他 AI
-- MGP 1.0 规范：节点类别、状态、关系依据、来源覆盖范围
-- 无远程服务与模型调用。默认仅内存存储；主动选择后才保存至浏览器 localStorage（不加密）
-- 不会执行导入 JSON 中夹带的命令或提示词
 
-## 范围
-仅展示导入的数据，不保证各 AI 导出覆盖全部内存；来源 `full` 只是数据提供者声明。单批限制 50,000 节点 / 250,000 边以防恶意超大数据，Canvas 性能上限独立于协议规模。
+- 力导向星图，支持平移、缩放和节点详情查看
+- 按标题、内容、类型及标签搜索，按节点类别筛选
+- 粘贴、选择文件或拖放导入，按稳定 ID 合并多批数据
+- 保留节点状态、关系依据和来源信息，推断关系使用虚线显示
+- 导出 JSON，按需保存至当前浏览器或清除本地缓存
+
+## 数据说明
+
+记忆内容和关系均来自导入数据，页面不会自行补充或推断。来源的 `full` 标记是导出方的覆盖范围声明，星盘无法验证是否遗漏。
+
+数据默认只保留在当前页面内存中；点击「保存到本机」后才写入浏览器本地存储，存储内容未加密。应用不上传记忆，也不执行导入内容中的脚本或指令。
+
+单个导入文件最大 12 MiB，每批最多 50,000 个节点、250,000 条边；实际渲染性能取决于数据规模和设备。
+
+## 文件
+
+- `web/`：页面、Canvas 星图、协议校验与合并逻辑
+- `protocol/mgp.schema.json`：MGP 1.0 JSON Schema
+- `protocol/sample.mgp.json`：示例数据
+- `protocol/export-prompt-zh.txt`：中文导出提示词
+- `tests/`：协议与增量导入测试
 
 ## 开发
+
+使用支持 `node:test` 的 Node.js 运行测试：
+
 ```bash
 node --test tests/test-mgp.mjs
 ```
-MIT license for this project's original source (no upstream source copied).
+
+## 致谢与许可
+
+图谱交互与架构参考：[not-mental-model](https://github.com/R4ph3rd/not-mental-model)。
+
+本项目采用 [MIT 许可证](LICENSE)。

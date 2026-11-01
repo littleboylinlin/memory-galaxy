@@ -13,7 +13,7 @@
 JSON 结构：
 {
   "protocol": "mgp/1.0",
-  "source": {"id":"platform:export-batch-1","platform":"chatgpt","scope":"当前实际可访问范围","completeness":"partial","exported_at":"2026-01-01T00:00:00Z"},
+  "source": {"id":"platform:export-batch-1","platform":"example","scope":"当前实际可访问范围","completeness":"partial","exported_at":"2026-01-01T00:00:00Z"},
   "nodes": [{"id":"platform:memory:stable-key","type":"memory","label":"示例标题","content":"示例正文","state":"confirmed","tags":["示例"],"source_ref":"来源引用"}],
   "edges": []
 }

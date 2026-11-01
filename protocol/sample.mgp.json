@@ -30,10 +30,10 @@
       "state": "confirmed"
     },
     {
-      "id": "demo:skill:typescript",
-      "label": "TypeScript",
+      "id": "demo:skill:javascript",
+      "label": "JavaScript",
       "type": "skill",
-      "content": "用于静态类型约束和前端开发。",
+      "content": "使用原生 JavaScript 和 Canvas 绘制交互星图。",
       "state": "confirmed"
     },
     {
@@ -87,8 +87,8 @@
       "basis": "explicit"
     },
     {
-      "from": "demo:topic:graph",
-      "to": "demo:skill:typescript",
+      "from": "demo:project:galaxy",
+      "to": "demo:skill:javascript",
       "type": "implemented_with",
       "basis": "explicit"
     },

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Memory Galaxy | 记忆星盘协议演示</title>
+<title>Memory Galaxy | 记忆星盘</title>
 <style>
 :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;color:#e5eafa;background:#060915;font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #8fbdff;outline-offset:2px}button:disabled{opacity:.45;cursor:not-allowed}
 .app{display:grid;grid-template-columns:350px minmax(0,1fr);height:100dvh;min-height:560px}
@@ -42,29 +42,29 @@ canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}canvas
 <div class="app">
 <aside class="sidebar">
   <div class="logo"><div class="logo-icon">✦</div><h1>Memory Galaxy</h1></div>
-  <div class="muted small">MGP 1.0 · 纯协议驱动 · 本地运行</div>
-  <p class="intro muted">一条记忆一颗星，一条关系一条连线。AI 负责生成标准 JSON，星盘负责校验和显示。</p>
+  <div class="muted small">MGP 1.0 · 本地运行</div>
+  <p class="intro muted">把记忆与关系整理成可以探索的星图，支持多个来源的增量导入。</p>
   <div class="stats"><div class="stat"><strong id="nodeCount">0</strong><span>星体 / 节点</span></div><div class="stat"><strong id="edgeCount">0</strong><span>关系 / 连线</span></div><div class="stat"><strong id="sourceCount">0</strong><span>数据源</span></div></div>
-  <div class="section-title">跨 AI 导入</div>
+  <div class="section-title">导入记忆</div>
   <div class="actions"><button class="btn" id="copyPrompt">✦ 复制导出提示词</button><button class="btn" id="chooseFile">⇧ 导入文件</button></div>
   <input type="file" id="fileInput" accept=".json,application/json">
-  <p class="small muted">把提示词发给任何 AI，再将它输出的标准 JSON 粘贴回来。星盘本身不使用 API。</p>
+  <p class="small muted">复制导出提示词，向 AI 获取标准 JSON，或直接导入已有的 JSON 文件。</p>
   <textarea id="input" class="field" spellcheck="false" placeholder='粘贴 {"protocol":"mgp/1.0", ...} ...'></textarea>
   <div class="actions" style="margin-top:9px"><button class="btn primary" id="importBtn">导入并合并</button><button class="btn ghost" id="resetBtn">示例重置</button></div>
-  <div id="notice" class="notice" role="status">当前显示虚构演示数据，没有读取任何真实个人记忆。</div>
+  <div id="notice" class="notice" role="status">当前显示示例星图，导入 JSON 即可添加自己的记忆。</div>
   <div class="section-title">查找记忆</div>
   <input class="field" id="search" placeholder="搜索标题、内容、类型、标签…">
   <div class="section-title">分类筛选</div>
   <div class="filter" id="filters"></div>
   <div class="section-title">数据管理</div>
   <div class="actions"><button class="btn" id="exportBtn">↓ 导出星盘 JSON</button><button class="btn" id="saveBtn">◈ 保存到本机</button><button class="btn" id="clearSaveBtn">清除缓存</button></div>
-  <p class="small muted">默认仅在当前页面内存中处理；只有点击「保存到本机」才会写入浏览器 localStorage。请勿把私人记忆上传到不信任的网站。</p>
+  <p class="small muted">数据在浏览器中处理；点击「保存到本机」后，下次打开时可恢复。本机存储未加密。</p>
 </aside>
 <main class="main" id="viewport">
   <canvas id="sky" aria-label="可拖动缩放的记忆关系星图"></canvas>
   <div class="topbar"><div><div class="heading">✧ MEMORY CONSTELLATION</div><div class="subheading" id="coverage">覆盖范围：仅演示数据</div></div><div class="top-right">滚轮缩放 · 拖拽平移 · 点击星星</div></div>
   <section class="inspector" id="inspector" aria-live="polite"><button class="close" id="closeInspector" title="关闭">×</button><span class="badge" id="detailType"></span><h2 id="detailTitle"></h2><p id="detailContent"></p><div class="meta" id="detailMeta"></div><div class="meta" id="detailLinks"></div></section>
-  <div class="footer">本地渲染 · 非 AI 推断的关系 · 无网络上传</div>
+  <div class="footer">本地渲染 · 关系来自导入数据</div>
   <div class="drop" id="drop">释放 JSON 文件导入星图 ✦</div>
 </main>
 </div>
