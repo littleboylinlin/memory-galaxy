@@ -1,106 +1,733 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
-<title>Memory Galaxy | 记忆星盘</title>
-<link rel="stylesheet" href="./import.css">
-<style>
-:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;color:#e5eafa;background:#060915;font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #8fbdff;outline-offset:2px}button:disabled{opacity:.45;cursor:not-allowed}
-.app{display:grid;grid-template-columns:350px minmax(0,1fr);height:100dvh;min-height:560px}
-.sidebar{padding:24px 19px;overflow:auto;border-right:1px solid #26304b;background:linear-gradient(145deg,#10172b,#080d19 80%)}
-.logo{display:flex;align-items:center;gap:12px;margin-bottom:7px}
-.logo-icon{display:grid;place-items:center;border-radius:14px;width:42px;height:42px;background:#1c2d55;color:#c9dcff;font-size:27px}
-.logo h1{font-size:20px;letter-spacing:.4px;margin:0}.muted{color:#96a2bd}.small{font-size:12px;line-height:1.65}
-.intro{font-size:13px;line-height:1.7;margin:10px 0 22px}
-.section-title{font-size:11px;text-transform:uppercase;color:#8a9cbe;letter-spacing:2px;margin:23px 0 10px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-.stat{background:#141e34;border:1px solid #293551;padding:10px;border-radius:12px}
-.stat strong{display:block;font-size:22px;color:#dceaff}.stat span{font-size:11px;color:#91a4c6}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#182543;border:1px solid #354765;color:#d7e5ff;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;transition:background .18s}
-.btn:hover{background:#24345b}.btn.primary{background:#6389e5;border-color:#6389e5;color:#061125}.btn.primary:hover{background:#80a2f7}.btn.ghost{background:transparent}
-.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1}
-.field{width:100%;border:1px solid #354361;background:#0a1226;color:#f0f3ff;border-radius:10px;padding:12px;font-size:13px}
-.field::placeholder{color:#7887a7}textarea.field{height:155px;resize:vertical;line-height:1.55}
-input[type=file]{display:none}.notice{margin-top:12px;background:#13223a;border:1px solid #335270;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.6;color:#bdccdf;white-space:pre-wrap}
-.notice.error{border-color:#98576b;background:#2b1a2b;color:#ffc8d0}
-.filter{display:flex;flex-wrap:wrap;gap:6px}.chip{border:1px solid #33405e;background:#111b32;color:#a6b4d1;padding:6px 10px;border-radius:99px;font-size:11px}.chip.active{background:#31508a;border-color:#557cbb;color:#fff}
-.main{position:relative;overflow:hidden;background:radial-gradient(ellipse at 43% 47%,#162446 0%,#0a1127 46%,#040817 100%)}
-canvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none}canvas.grabbing{cursor:grabbing}
-.topbar{pointer-events:none;position:absolute;top:22px;left:26px;right:22px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.heading{font-size:15px;font-weight:700;letter-spacing:.6px}.subheading{font-size:11px;color:#97aacb;margin-top:4px}
-.top-right{pointer-events:auto;background:#0c1428a8;border:1px solid #334468;border-radius:9px;padding:8px 11px;color:#b6c3df;font-size:11px}
-.inspector{position:absolute;bottom:24px;right:24px;width:min(335px,calc(100% - 36px));padding:19px;border:1px solid #50689e;background:#111b31f5;border-radius:17px;box-shadow:0 10px 45px #0009;display:none}.inspector.visible{display:block}
-.inspector h2{font-size:18px;margin:8px 0}.inspector p{font-size:13px;line-height:1.7;color:#cfdbf1;max-height:170px;overflow:auto;white-space:pre-wrap}
-.inspector .meta{font-size:11px;color:#a8bbd8;margin-top:9px;overflow-wrap:anywhere}
-.close{float:right;background:transparent;border:none;color:#bbcdf0;font-size:18px}
-.badge{display:inline-block;border:1px solid #425981;border-radius:8px;padding:4px 8px;color:#abc7ee;font-size:11px}
-.footer{position:absolute;bottom:19px;left:26px;color:#8093b5;font-size:11px;pointer-events:none}
-.drop{position:absolute;inset:13px;border:2px dashed #8cafed;border-radius:20px;background:#1d325cdd;z-index:7;display:none;place-items:center;font-size:23px;font-weight:700;pointer-events:none}.drop.active{display:grid}
-@media(max-width:800px){.app{display:flex;flex-direction:column;height:auto;min-height:100dvh}.sidebar{order:2;border-right:none;border-top:1px solid #26304b}.main{order:1;height:62vh;min-height:360px}.inspector{bottom:42px;right:12px}.topbar{top:14px;left:15px;right:15px}.footer{left:14px;bottom:12px}.top-right{font-size:10px}}
-</style>
-</head>
-<body>
-<div class="app">
-<aside class="sidebar">
-  <div class="logo"><div class="logo-icon">✦</div><h1>Memory Galaxy</h1></div>
-  <div class="muted small">MGP 1.1 · 本地运行</div>
-  <p class="intro muted">把记忆与关系整理成可以探索的星图，支持多个来源的增量导入。</p>
-  <div class="stats"><div class="stat"><strong id="nodeCount">0</strong><span>星体 / 节点</span></div><div class="stat"><strong id="edgeCount">0</strong><span>关系 / 连线</span></div><div class="stat"><strong id="sourceCount">0</strong><span>数据源</span></div></div>
-  <div class="section-title">导入记忆</div>
-  <div class="actions"><button class="btn" id="copyPrompt">✦ 复制导出提示词</button><button class="btn" id="chooseFile">⇧ 导入文件</button></div>
-  <input type="file" id="fileInput" accept=".json,.jsonl,.ndjson,application/json" aria-label="选择记忆文件">
-  <p class="small muted">复制导出提示词，向 AI 获取标准 JSON，或直接导入已有的 JSON 文件。</p>
-  <label for="input" class="small muted">MGP JSON / JSONL</label>
-  <textarea id="input" class="field" spellcheck="false" placeholder='粘贴 {"protocol":"mgp/1.1", ...} ...'></textarea>
-  <div class="actions" style="margin-top:9px"><button class="btn primary" id="importBtn">预览导入</button><button class="btn ghost" id="resetBtn">示例重置</button></div>
-  <div id="notice" class="notice" role="status">当前显示示例星图，导入 JSON 即可添加自己的记忆。</div>
-  <label class="section-title" for="search" style="display:block">查找记忆</label>
-  <input class="field" id="search" placeholder="搜索标题、内容、类型、标签…">
-  <div class="section-title">分类筛选</div>
-  <div class="filter" id="filters"></div>
-  <div class="section-title">数据管理</div>
-  <div class="actions"><button class="btn" id="exportBtn">↓ 导出星盘 JSON</button><button class="btn" id="saveBtn">◈ 保存到本机</button><button class="btn" id="clearSaveBtn">清除缓存</button></div>
-  <p class="small muted">数据在浏览器中处理；点击「保存到本机」后，下次打开时可恢复。本机存储未加密。</p>
-</aside>
-<main class="main" id="viewport">
-  <canvas id="sky" aria-label="可拖动缩放的记忆关系星图"></canvas>
-  <div class="topbar"><div><div class="heading">✧ MEMORY CONSTELLATION</div><div class="subheading" id="coverage">覆盖范围：仅演示数据</div></div><div class="top-right">滚轮缩放 · 拖拽平移 · 点击星星</div></div>
-  <section class="inspector" id="inspector" aria-live="polite"><button class="close" id="closeInspector" title="关闭">×</button><span class="badge" id="detailType"></span><h2 id="detailTitle"></h2><p id="detailContent"></p><div class="meta" id="detailMeta"></div><div class="meta" id="detailLinks"></div></section>
-  <div class="footer">本地渲染 · 关系来自导入数据</div>
-  <div class="drop" id="drop">释放 JSON / JSONL 文件，预览导入 ✦</div>
-</main>
-</div>
-<dialog id="importDialog" aria-labelledby="importTitle" aria-describedby="importDescription">
-  <header class="import-heading"><div><h2 id="importTitle">预览记忆导入</h2><p id="importDescription">先校验，再处理冲突。点击确认前，当前图谱不会改变。</p></div><button type="button" class="close" id="closeImport" aria-label="关闭导入预览">×</button></header>
-  <div class="import-body">
-    <section class="import-editor" aria-label="导入内容">
-      <div id="importOrigin" class="import-origin"></div>
-      <label for="importText">完整批次内容</label><textarea class="field" id="importText" spellcheck="false" placeholder="粘贴 MGP JSON 或 JSONL"></textarea>
-      <p class="small muted">支持 MGP 1.0 / 1.1，单批不超过 12 MiB。JSONL 使用一条 header 记录与逐行的 node / edge 记录。</p>
-      <button type="button" class="btn" id="analyzeImport">重新校验</button>
-      <p class="small muted">缺少的节点不会被自动删除。只有带删除记录、并经你确认的操作才会移除数据。</p>
-    </section>
-    <section class="import-preview" aria-label="导入差异预览">
-      <div id="importPreview" hidden>
-        <span class="preview-format" id="previewFormat"></span>
-        <p class="preview-demo" id="previewDemo">当前浏览的是示例。确认后将从空白工作区导入，示例不会混入你的记忆。</p>
-        <h3>拟应用的变化</h3><div class="preview-stats" id="previewSummary"></div><p id="previewTotals" class="small muted"></p>
-        <h3>本批来源与覆盖声明</h3><ul class="preview-sources" id="previewSources"></ul><ul class="preview-warnings" id="previewWarnings" hidden></ul>
-        <details class="record-disclosure"><summary id="recordCount">查看本批记录</summary><ul class="preview-records" id="previewRecords"></ul></details>
-        <section id="conflictSection" hidden>
-          <h3 id="conflictCount">冲突处理</h3>
-          <label for="conflictPolicy" class="conflict-policy">批量处理策略<select id="conflictPolicy"><option value="review">逐项确认</option><option value="keep">全部保留当前</option><option value="incoming">全部采用导入</option><option value="newer">采用较新版本（无法比较时仍需确认）</option></select></label>
-          <p class="small muted">同一来源的 revision 优先，其次比较带时区的更新时间；不同来源不会比较 revision。时间缺失或相同不会猜测。</p>
-          <div id="previewConflicts"></div>
-          <div class="conflict-pagination"><button type="button" class="btn ghost" id="conflictPrevious">上一页</button><span id="conflictPage"></span><button type="button" class="btn ghost" id="conflictNext">下一页</button></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080b17" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Memory Galaxy | 记忆星盘</title>
+    <link rel="stylesheet" href="./app.css" />
+    <link rel="stylesheet" href="./import.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#mainArea">跳到记忆工作区</a>
+    <div class="app" id="app" aria-busy="true">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">✦</span>
+          <div>
+            <h1>Memory Galaxy</h1>
+            <span class="brand-sub"
+              >记忆星盘 <span class="version">MGP 1.1</span></span
+            >
+          </div>
+        </div>
+        <div class="header-stats" aria-label="图谱统计">
+          <div><strong id="nodeCount">—</strong><span>记忆</span></div>
+          <div><strong id="edgeCount">—</strong><span>关系</span></div>
+          <div><strong id="sourceCount">—</strong><span>来源</span></div>
+        </div>
+        <div class="header-actions">
+          <span id="saveStatus" class="save-status">正在载入</span
+          ><button
+            class="btn icon-button mobile-menu"
+            id="menuBtn"
+            aria-controls="sidebar"
+            aria-expanded="false"
+            aria-label="打开工具栏"
+          >
+            ☰
+          </button>
+        </div>
+      </header>
+      <div class="workbench">
+        <button
+          id="drawerBackdrop"
+          class="drawer-backdrop"
+          aria-label="关闭工具栏"
+          hidden
+        ></button>
+        <aside class="sidebar" id="sidebar" aria-label="星盘工具">
+          <div class="sidebar-intro">
+            <span class="eyebrow">YOUR MEMORY, CONNECTED</span>
+            <h2>每颗星，都有来处。</h2>
+            <p>在自己的记忆中，发现已有的联系。</p>
+          </div>
+          <label class="field-label" for="search">查找记忆</label>
+          <div class="search-box">
+            <span aria-hidden="true">⌕</span
+            ><input
+              id="search"
+              type="search"
+              placeholder="标题、内容、标签或 ID"
+              autocomplete="off"
+            />
+          </div>
+          <div id="searchSummary" class="small muted" role="status"></div>
+          <ul
+            id="searchResults"
+            class="search-results"
+            aria-label="搜索结果"
+          ></ul>
+          <div class="section-heading">
+            <h3>浏览方式</h3>
+            <button class="text-button" id="clearFilters">清除筛选</button>
+          </div>
+          <div class="filter" id="filters" aria-label="记忆类型筛选"></div>
+          <div class="field-row">
+            <label for="stateFilter">状态</label
+            ><select id="stateFilter">
+              <option value="all">全部状态</option>
+              <option value="confirmed">已确认</option>
+              <option value="inferred">推测</option>
+              <option value="disputed">有争议</option>
+              <option value="deprecated">已过时</option>
+              <option value="unknown">未知</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="clusterBy">星团分组</label
+            ><select id="clusterBy">
+              <option value="type">按记忆类型</option>
+              <option value="component">按真实连通关系</option>
+              <option value="source">按记录来源</option>
+              <option value="none">不分组</option>
+            </select>
+          </div>
+          <div class="view-options">
+            <label
+              ><input id="showLabels" type="checkbox" checked />显示标签</label
+            ><label
+              ><input
+                id="animateLayout"
+                type="checkbox"
+                checked
+              />布局动画</label
+            >
+          </div>
+          <div class="section-heading">
+            <h3>记录与导入</h3>
+            <span class="small muted">JSON / JSONL</span>
+          </div>
+          <button class="btn primary full" id="addNodeBtn">＋ 添加记忆</button>
+          <div class="actions">
+            <button class="btn" id="copyPrompt">复制导出提示词</button
+            ><button class="btn" id="chooseFile">导入文件</button>
+          </div>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".json,.jsonl,.ndjson,application/json"
+            aria-label="选择记忆文件"
+            hidden
+          />
+          <label class="field-label small" for="input"
+            >粘贴 MGP 数据，或将文件拖入页面</label
+          ><textarea
+            id="input"
+            wrap="off"
+            maxlength="12582912"
+            autocapitalize="off"
+            class="field import-input"
+            spellcheck="false"
+            placeholder='{"protocol":"mgp/1.1", …}'
+          ></textarea>
+          <button class="btn full" id="importBtn">预览导入</button>
+          <div id="notice" class="notice" role="status">
+            当前显示示例星图。导入或添加第一条记忆时，示例不会混入。
+          </div>
+          <div class="section-heading">
+            <h3>数据与备份</h3>
+            <span class="local-indicator">● 仅本地</span>
+          </div>
+          <div class="actions">
+            <button class="btn" id="saveBtn">保存到本机</button
+            ><button class="btn" id="exportBtn">导出星盘 JSON</button>
+          </div>
+          <label class="check-row"
+            ><input type="checkbox" id="autosave" />自动保存到本机</label
+          >
+          <div class="actions">
+            <button class="btn" id="backupBtn">下载完整备份</button
+            ><button class="btn" id="restoreBackupBtn">恢复完整备份</button>
+          </div>
+          <input
+            type="file"
+            id="backupFile"
+            accept=".json,application/json"
+            hidden
+            aria-label="选择完整备份文件"
+          />
+          <p class="small muted">
+            本机存储和下载文件均未加密。完整备份包含图谱、快照与视图，可自行保管。
+          </p>
+          <div class="sidebar-bottom">
+            <button class="text-button" id="newWorkspaceBtn">新建空白</button
+            ><button class="text-button" id="resetBtn">查看示例</button
+            ><button class="text-button danger-text" id="clearSaveBtn">
+              清除缓存
+            </button>
+          </div>
+        </aside>
+        <main class="main-area" id="mainArea" tabindex="-1">
+          <nav class="view-nav" aria-label="记忆视图">
+            <div role="tablist" aria-label="切换记忆视图">
+              <button
+                id="tab-graph"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panel-graph"
+                data-view="graph"
+              >
+                星盘</button
+              ><button
+                id="tab-list"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-list"
+                data-view="list"
+                tabindex="-1"
+              >
+                记忆列表</button
+              ><button
+                id="tab-timeline"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-timeline"
+                data-view="timeline"
+                tabindex="-1"
+              >
+                时间线</button
+              ><button
+                id="tab-history"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-history"
+                data-view="history"
+                tabindex="-1"
+              >
+                快照</button
+              ><button
+                id="tab-sources"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-sources"
+                data-view="sources"
+                tabindex="-1"
+              >
+                来源
+              </button>
+            </div>
+            <span class="demo-label" id="demoLabel">示例星图</span>
+          </nav>
+          <section
+            id="panel-graph"
+            class="view-panel stage"
+            role="tabpanel"
+            aria-labelledby="tab-graph"
+          >
+            <div class="stage-heading">
+              <span class="eyebrow">MEMORY CONSTELLATION</span>
+              <p id="coverage">覆盖范围：仅示例数据</p>
+            </div>
+            <div id="viewport" class="viewport">
+              <canvas
+                id="sky"
+                tabindex="0"
+                aria-label="记忆星图；方向键平移，加减号缩放，Home 适配。也可切换到记忆列表。"
+                aria-describedby="graphHelp"
+              ></canvas>
+            </div>
+            <div class="graph-controls" aria-label="星图操作">
+              <button class="btn icon-button" id="zoomIn" aria-label="放大星图">
+                ＋</button
+              ><span id="zoomValue">100%</span
+              ><button
+                class="btn icon-button"
+                id="zoomOut"
+                aria-label="缩小星图"
+              >
+                −</button
+              ><button class="btn" id="fitGraph">适配星图</button>
+            </div>
+            <div class="graph-empty" id="graphEmpty" hidden>
+              <span aria-hidden="true">✧</span>
+              <h2>从第一颗星开始</h2>
+              <p>导入已有记忆，或在工具栏添加一条。</p>
+              <button class="btn" id="emptyImport">打开导入工具</button>
+            </div>
+            <div class="stage-footer">
+              <span id="renderStatus" aria-live="off"></span>
+              <p id="graphHelp">
+                拖动星星固定位置 · 拖动空白平移 · 滚轮或双指缩放
+              </p>
+            </div>
+          </section>
+          <section
+            id="panel-list"
+            class="view-panel content-panel"
+            role="tabpanel"
+            aria-labelledby="tab-list"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">MEMORY LIBRARY</span>
+                <h2>记忆列表</h2>
+                <p id="listSummary"></p>
+              </div>
+            </div>
+            <div id="nodeList" class="node-list"></div>
+            <div class="pagination">
+              <button class="btn" id="listPrevious">上一页</button
+              ><span id="listPage"></span
+              ><button class="btn" id="listNext">下一页</button>
+            </div>
+          </section>
+          <section
+            id="panel-timeline"
+            class="view-panel content-panel"
+            role="tabpanel"
+            aria-labelledby="tab-timeline"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">MEMORY IN TIME</span>
+                <h2>时间线</h2>
+                <p>
+                  记忆按数据中提供的更新时间排列，不代表发生或创建时间。缺少时间的记忆单独列出。
+                </p>
+              </div>
+            </div>
+            <div class="timeline-switch">
+              <button
+                class="chip active"
+                id="memoryTimelineBtn"
+                aria-pressed="true"
+              >
+                记忆更新时间</button
+              ><button
+                class="chip"
+                id="activityTimelineBtn"
+                aria-pressed="false"
+              >
+                本机操作记录
+              </button>
+            </div>
+            <div id="timelineList" class="timeline"></div>
+            <div class="pagination">
+              <button class="btn" id="timelinePrevious">上一页</button
+              ><span id="timelinePage"></span
+              ><button class="btn" id="timelineNext">下一页</button>
+            </div>
+          </section>
+          <section
+            id="panel-history"
+            class="view-panel content-panel"
+            role="tabpanel"
+            aria-labelledby="tab-history"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">RETURN TO A MOMENT</span>
+                <h2>快照与撤销</h2>
+                <p>
+                  每次修改前保留一份图谱。最多保留 12 份、总计 16
+                  MiB；超出后移除最早的快照。需要长期保存时，请下载完整备份。
+                </p>
+              </div>
+            </div>
+            <div class="actions compact-actions">
+              <button class="btn primary" id="snapshotBtn">创建命名快照</button
+              ><button class="btn" id="undoBtn">撤销上次修改</button>
+            </div>
+            <div id="snapshotList" class="snapshot-list"></div>
+          </section>
+          <section
+            id="panel-sources"
+            class="view-panel content-panel"
+            role="tabpanel"
+            aria-labelledby="tab-sources"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">EVERY MEMORY HAS A SOURCE</span>
+                <h2>来源与覆盖范围</h2>
+                <p>
+                  以下是导出方或用户填写的声明，未经独立验证。即使声明为全量，也不能据此认定已读取某个平台的全部记忆。
+                </p>
+              </div>
+            </div>
+            <div id="sourceList" class="source-list"></div>
+          </section>
+          <section
+            id="inspector"
+            class="inspector"
+            aria-labelledby="detailTitle"
+            hidden
+          >
+            <div class="inspector-top">
+              <span class="badge" id="detailType"></span
+              ><button
+                class="btn icon-button"
+                id="closeInspector"
+                aria-label="关闭记忆详情"
+              >
+                ×
+              </button>
+            </div>
+            <h2 id="detailTitle" tabindex="-1"></h2>
+            <span id="detailState" class="state-badge"></span>
+            <p id="detailContent" class="detail-content"></p>
+            <div id="detailTags" class="tags"></div>
+            <dl id="detailMeta" class="metadata"></dl>
+            <div class="actions">
+              <button class="btn" id="editNodeBtn">编辑记忆</button
+              ><button class="btn" id="pinNodeBtn">固定位置</button
+              ><button class="btn danger-text" id="deleteNodeBtn">删除</button>
+            </div>
+            <div class="section-heading">
+              <h3 id="detailLinkCount">关联关系</h3>
+              <button class="text-button" id="addEdgeBtn">＋ 关系</button>
+            </div>
+            <p class="small muted">
+              实线：明确或规则关系；虚线：推测关系。布局位置不代表新增关系。
+            </p>
+            <div id="detailLinks"></div>
+            <div class="pagination small">
+              <button class="btn" id="edgePrevious">上一页</button
+              ><span id="edgePage"></span
+              ><button class="btn" id="edgeNext">下一页</button>
+            </div>
+          </section>
+          <div class="drop" id="drop">释放 JSON / JSONL 文件，预览导入</div>
+        </main>
+      </div>
+      <footer class="app-footer">
+        <span>开放协议 · 本地处理 · 关系有据可查</span
+        ><span id="layoutStatus" role="status">后台布局</span>
+      </footer>
+    </div>
+    <dialog
+      id="importDialog"
+      aria-labelledby="importTitle"
+      aria-describedby="importDescription"
+    >
+      <header class="import-heading">
+        <div>
+          <h2 id="importTitle">预览记忆导入</h2>
+          <p id="importDescription">
+            先校验，再处理冲突。点击确认前，当前图谱不会改变。
+          </p>
+        </div>
+        <button
+          type="button"
+          class="close"
+          id="closeImport"
+          aria-label="关闭导入预览"
+        >
+          ×
+        </button>
+      </header>
+      <div class="import-body">
+        <section class="import-editor" aria-label="导入内容">
+          <div id="importOrigin" class="import-origin"></div>
+          <label for="importText">完整批次内容</label>
+          <p id="importTextHint" class="small muted" hidden></p>
+          <textarea
+            class="field"
+            id="importText"
+            aria-describedby="importTextHint"
+            wrap="off"
+            maxlength="12582912"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="粘贴 MGP JSON 或 JSONL"
+          ></textarea>
+          <p class="small muted">
+            支持 MGP 1.0 / 1.1，单批不超过 12 MiB。JSONL 使用一条 header
+            记录与逐行的 node / edge 记录。
+          </p>
+          <button type="button" class="btn" id="analyzeImport">重新校验</button>
+          <p class="small muted">
+            缺少的节点不会被自动删除。只有带删除记录、并经你确认的操作才会移除数据。
+          </p>
+        </section>
+        <section class="import-preview" aria-label="导入差异预览">
+          <div id="importPreview" hidden>
+            <span class="preview-format" id="previewFormat"></span>
+            <p class="preview-demo" id="previewDemo">
+              当前浏览的是示例。确认后将从空白工作区导入，示例不会混入你的记忆。
+            </p>
+            <h3>拟应用的变化</h3>
+            <div class="preview-stats" id="previewSummary"></div>
+            <p id="previewTotals" class="small muted"></p>
+            <h3>本批来源与覆盖声明</h3>
+            <ul class="preview-sources" id="previewSources"></ul>
+            <ul class="preview-warnings" id="previewWarnings" hidden></ul>
+            <details class="record-disclosure">
+              <summary id="recordCount">查看本批记录</summary>
+              <ul class="preview-records" id="previewRecords"></ul>
+            </details>
+            <section id="conflictSection" hidden>
+              <h3 id="conflictCount">冲突处理</h3>
+              <label for="conflictPolicy" class="conflict-policy"
+                >批量处理策略<select id="conflictPolicy">
+                  <option value="review">逐项确认</option>
+                  <option value="keep">全部保留当前</option>
+                  <option value="incoming">全部采用导入</option>
+                  <option value="newer">
+                    采用较新版本（无法比较时仍需确认）
+                  </option>
+                </select></label
+              >
+              <p class="small muted">
+                同一来源的 revision
+                优先，其次比较带时区的更新时间；不同来源不会比较
+                revision。时间缺失或相同不会猜测。
+              </p>
+              <div id="previewConflicts"></div>
+              <div class="conflict-pagination">
+                <button type="button" class="btn ghost" id="conflictPrevious">
+                  上一页</button
+                ><span id="conflictPage"></span
+                ><button type="button" class="btn ghost" id="conflictNext">
+                  下一页
+                </button>
+              </div>
+            </section>
+          </div>
         </section>
       </div>
-    </section>
-  </div>
-  <div id="importStatus" class="notice import-status" role="status" aria-live="polite">等待校验。</div><ul id="importErrors" class="import-errors" aria-label="校验错误" hidden></ul>
-  <footer class="import-footer"><p class="small import-privacy">仅在本地处理，内容不会发送给模型或外部服务。</p><button type="button" class="btn ghost" id="cancelImport">取消</button><button type="button" class="btn primary" id="applyImport" disabled>确认导入</button></footer>
-</dialog>
-<script type="module" src="./app.mjs"></script>
-</body>
+      <div
+        id="importStatus"
+        class="notice import-status"
+        role="status"
+        aria-live="polite"
+      >
+        等待校验。
+      </div>
+      <ul
+        id="importErrors"
+        class="import-errors"
+        aria-label="校验错误"
+        hidden
+      ></ul>
+      <footer class="import-footer">
+        <p class="small import-privacy">
+          仅在本地处理，内容不会发送给模型或外部服务。
+        </p>
+        <button type="button" class="btn ghost" id="cancelImport">取消</button
+        ><button type="button" class="btn primary" id="applyImport" disabled>
+          确认导入
+        </button>
+      </footer>
+    </dialog>
+
+    <dialog
+      class="editor-dialog"
+      id="nodeDialog"
+      aria-labelledby="nodeDialogTitle"
+    >
+      <form id="nodeForm">
+        <header class="dialog-heading">
+          <h2 id="nodeDialogTitle">添加记忆</h2>
+          <button
+            type="button"
+            class="btn icon-button"
+            data-close="nodeDialog"
+            aria-label="关闭记忆编辑"
+          >
+            ×
+          </button>
+        </header>
+        <div class="dialog-body form-grid">
+          <label class="wide"
+            >稳定 ID<input
+              class="field"
+              id="nodeId"
+              maxlength="256"
+              placeholder="留空将生成唯一 ID" /></label
+          ><label class="wide"
+            >标题<input
+              class="field"
+              id="nodeLabel"
+              required
+              maxlength="200" /></label
+          ><label>类型<select id="nodeType"></select></label
+          ><label>状态<select id="nodeState"></select></label
+          ><label class="wide"
+            >记忆内容<textarea
+              class="field"
+              id="nodeContent"
+              rows="6"
+              maxlength="100000"
+            ></textarea></label
+          ><label class="wide"
+            >标签<span class="small muted">用逗号或换行分隔</span
+            ><textarea
+              class="field"
+              id="nodeTags"
+              rows="2"
+              maxlength="100000"
+            ></textarea></label
+          ><label class="wide"
+            >出处引用<input
+              class="field"
+              id="nodeRef"
+              maxlength="2000"
+              placeholder="可选，例如文档编号或原始引用" /></label
+          ><label class="check-row wide"
+            ><input
+              type="checkbox"
+              id="nodeSensitive"
+            />标记为敏感内容（不会自动加密）</label
+          >
+          <p class="small muted wide">
+            手动修改会记录本机来源和修改时间，原有来源追溯会保留。现有 ID
+            保持稳定。
+          </p>
+          <p id="nodeError" class="form-error wide" role="alert" hidden></p>
+        </div>
+        <footer class="dialog-footer">
+          <button type="button" class="btn" data-close="nodeDialog">取消</button
+          ><button type="submit" class="btn primary">保存记忆</button>
+        </footer>
+      </form>
+    </dialog>
+    <dialog
+      class="editor-dialog"
+      id="edgeDialog"
+      aria-labelledby="edgeDialogTitle"
+    >
+      <form id="edgeForm">
+        <header class="dialog-heading">
+          <h2 id="edgeDialogTitle">添加关系</h2>
+          <button
+            type="button"
+            class="btn icon-button"
+            data-close="edgeDialog"
+            aria-label="关闭关系编辑"
+          >
+            ×
+          </button>
+        </header>
+        <div class="dialog-body form-grid">
+          <label class="wide"
+            >起点 ID<input
+              class="field"
+              id="edgeFrom"
+              list="nodeChoices"
+              required
+              maxlength="256" /></label
+          ><label class="wide"
+            >终点 ID<input
+              class="field"
+              id="edgeTo"
+              list="nodeChoices"
+              required
+              maxlength="256" /></label
+          ><datalist id="nodeChoices"></datalist
+          ><label
+            >关系类型<input
+              class="field"
+              id="edgeType"
+              required
+              maxlength="256"
+              placeholder="例如 supports" /></label
+          ><label
+            >依据类型<select id="edgeBasis">
+              <option value="explicit">明确关系</option>
+              <option value="inferred">推测关系</option>
+              <option value="rule">规则关系</option>
+            </select></label
+          ><label class="wide"
+            >依据或证据<textarea
+              class="field"
+              id="edgeEvidence"
+              required
+              rows="4"
+              maxlength="10000"
+              placeholder="说明这条关系的出处、推测依据或规则"
+            ></textarea>
+          </label>
+          <p class="small muted wide">
+            关系由你明确创建，不会根据布局距离或相似内容自动编造。起点与终点必须是现有节点。
+          </p>
+          <p id="edgeError" class="form-error wide" role="alert" hidden></p>
+        </div>
+        <footer class="dialog-footer">
+          <button type="button" class="btn" data-close="edgeDialog">取消</button
+          ><button type="submit" class="btn primary">保存关系</button>
+        </footer>
+      </form>
+    </dialog>
+    <dialog
+      class="editor-dialog small-dialog"
+      id="confirmDialog"
+      aria-labelledby="confirmTitle"
+    >
+      <header class="dialog-heading"><h2 id="confirmTitle"></h2></header>
+      <div class="dialog-body"><p id="confirmText"></p></div>
+      <footer class="dialog-footer">
+        <button class="btn" id="cancelAction">取消</button
+        ><button class="btn primary" id="confirmAction">确认</button>
+      </footer>
+    </dialog>
+    <dialog
+      class="editor-dialog small-dialog"
+      id="snapshotDialog"
+      aria-labelledby="snapshotTitle"
+    >
+      <form id="snapshotForm">
+        <header class="dialog-heading">
+          <h2 id="snapshotTitle">创建命名快照</h2>
+        </header>
+        <div class="dialog-body">
+          <label for="snapshotLabel">快照名称</label
+          ><input
+            class="field"
+            id="snapshotLabel"
+            required
+            maxlength="120"
+            placeholder="例如：整理项目之后"
+          />
+        </div>
+        <footer class="dialog-footer">
+          <button type="button" class="btn" data-close="snapshotDialog">
+            取消</button
+          ><button type="submit" class="btn primary">创建快照</button>
+        </footer>
+      </form>
+    </dialog>
+    <dialog
+      class="editor-dialog small-dialog"
+      id="restoreDialog"
+      aria-labelledby="restoreTitle"
+    >
+      <header class="dialog-heading">
+        <h2 id="restoreTitle">恢复完整备份</h2>
+      </header>
+      <div class="dialog-body">
+        <ul id="restoreSummary" class="restore-summary"></ul>
+        <div id="restoreStatus" class="notice" role="status"></div>
+        <p class="small muted">
+          完整备份会替换整个工作区；若要合并图谱，请使用 MGP 导入。
+        </p>
+      </div>
+      <footer class="dialog-footer">
+        <button class="btn" id="cancelRestore">取消</button
+        ><button class="btn primary" id="confirmRestore" disabled>
+          确认恢复
+        </button>
+      </footer>
+    </dialog>
+    <script type="module" src="./app.mjs"></script>
+  </body>
 </html>

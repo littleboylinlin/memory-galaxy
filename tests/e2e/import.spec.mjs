@@ -15,7 +15,15 @@ const batch = (nodes = [node()], edges = [], extra = {}) => ({
   edges,
   ...extra,
 });
+async function toolsPanel(page) {
+  if (
+    (await page.locator("#menuBtn").isVisible()) &&
+    !(await page.locator("#sidebar").isVisible())
+  )
+    await page.locator("#menuBtn").click();
+}
 async function preview(page, data) {
+  await toolsPanel(page);
   await page
     .locator("#input")
     .fill(typeof data === "string" ? data : JSON.stringify(data));
@@ -32,6 +40,7 @@ async function apply(page, data) {
   await expect(page.locator("#importDialog")).not.toBeVisible();
 }
 async function exported(page) {
+  await toolsPanel(page);
   const downloading = page.waitForEvent("download");
   await page.locator("#exportBtn").click();
   const file = await downloading;
@@ -41,6 +50,7 @@ async function exported(page) {
 test.beforeEach(async ({ page }) => {
   await page.goto("/web/");
   await expect(page.locator("#nodeCount")).toHaveText("8");
+  await toolsPanel(page);
 });
 test("preview and cancellation do not modify the graph or storage", async ({
   page,
@@ -83,13 +93,11 @@ test("JSON syntax and field errors are actionable and preserve current data", as
 test("JSONL file imports use the same preview and confirmation", async ({
   page,
 }) => {
-  await page
-    .locator("#fileInput")
-    .setInputFiles({
-      name: "memories.jsonl",
-      mimeType: "application/x-ndjson",
-      buffer: Buffer.from(stringifyMgp(batch(), "jsonl")),
-    });
+  await page.locator("#fileInput").setInputFiles({
+    name: "memories.jsonl",
+    mimeType: "application/x-ndjson",
+    buffer: Buffer.from(stringifyMgp(batch(), "jsonl")),
+  });
   await expect(page.locator("#previewFormat")).toContainText("JSONL");
   await expect(page.locator("#importOrigin")).toHaveText("memories.jsonl");
   await expect(page.locator("#nodeCount")).toHaveText("8");
@@ -204,13 +212,11 @@ test("untrusted text stays text and makes no external requests", async ({
 test("oversized files are rejected before preview without changing the graph", async ({
   page,
 }) => {
-  await page
-    .locator("#fileInput")
-    .setInputFiles({
-      name: "large.json",
-      mimeType: "application/json",
-      buffer: Buffer.alloc(12 * 1024 * 1024 + 1, 32),
-    });
+  await page.locator("#fileInput").setInputFiles({
+    name: "large.json",
+    mimeType: "application/json",
+    buffer: Buffer.alloc(12 * 1024 * 1024 + 1, 32),
+  });
   await expect(page.locator("#importStatus")).toContainText("超过 12 MiB");
   await expect(page.locator("#applyImport")).toBeDisabled();
   await expect(page.locator("#nodeCount")).toHaveText("8");
@@ -294,6 +300,7 @@ test("saving and reloading the example never mixes it into the first import", as
   page,
 }) => {
   await page.locator("#saveBtn").click();
+  await expect(page.locator("#notice")).toContainText("已保存到这个浏览器");
   await page.reload();
   await expect(page.locator("#nodeCount")).toHaveText("8");
   await apply(page, batch());
@@ -310,13 +317,11 @@ test("cancelling a pending file read does not reopen the import dialog", async (
       });
     };
   });
-  await page
-    .locator("#fileInput")
-    .setInputFiles({
-      name: "slow.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(batch())),
-    });
+  await page.locator("#fileInput").setInputFiles({
+    name: "slow.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(batch())),
+  });
   await expect(page.locator("#importDialog")).toBeVisible();
   await page.locator("#cancelImport").click();
   await page.evaluate(async (data) => {
