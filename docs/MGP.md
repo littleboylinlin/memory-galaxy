@@ -86,7 +86,7 @@ JSON Schema 位于 [mgp.schema.json](../protocol/mgp.schema.json)。Schema 检�
 
 记录未提供 `source_id` 时继承本批来源。合并会保留已有来源追溯；相同来源与引用去重。`provenance` 的来源必须已声明，不能凭空引用另一个平台。
 
-工作区导出使用 `workspace:local` 作为汇总来源，实际来源保存在 `sources` 和各记录中。旧版已合并数据如果只留下 `merged` 而没有逐项来源，会保留这个未知的合并来源，不会反推每条记忆来自哪个平台。
+工作区导出使用 `workspace:local` 作为汇总来源，实际来源保存在 `sources` 和各记录中。若导入方已使用该 ID，汇总来源会选择未占用的 `workspace:local:1` 等 ID，不修改原始来源或记录引用。只有元数据与工作区汇总声明完全一致、且没有记录继承或引用它的主来源，才从实际来源列表中省略。旧版已合并数据如果只留下 `merged` 而没有逐项来源，会保留这个未知的合并来源，不会反推每条记忆来自哪个平台。
 
 ## 更新与冲突
 
@@ -171,4 +171,4 @@ JSON Schema 位于 [mgp.schema.json](../protocol/mgp.schema.json)。Schema 检�
 - 内容以纯文本处理；不会执行脚本、指令、Markdown 或导入的 URL。
 - 校验与差异计算在可取消的 Worker 中完成，30 秒超时后不应用。JSONL 按完整文本读取，尚未实现流式导入。
 
-资源上限是数据处理边界，不是 Canvas 布局的流畅性保证。大图渲染优化留在后续工作范围。
+资源上限是数据处理边界，不是 Canvas 布局的流畅性保证。现有布局与渲染策略见 [星盘与本机工作区](WORKSPACE.md)。
