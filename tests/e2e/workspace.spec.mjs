@@ -96,7 +96,7 @@ async function restoreFile(page, value) {
   await expect(page.locator("#restoreDialog")).toBeVisible();
 }
 test.beforeEach(async ({ page }) => {
-  await page.goto("/web/");
+  await page.goto("web/");
   await expect(page.locator("body")).toHaveAttribute("data-ready", "true");
 });
 
@@ -525,6 +525,7 @@ test("large graphs remain searchable and export all records despite display budg
 
 test("bulk pasted JSON avoids wrapping large single lines and remains importable", async ({
   page,
+  browserName,
 }) => {
   test.setTimeout(60000);
   const nodes = Array.from({ length: 10000 }, (_, i) => ({
@@ -533,13 +534,23 @@ test("bulk pasted JSON avoids wrapping large single lines and remains importable
     type: "memory",
   }));
   await tools(page);
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.evaluate(
-    (text) => navigator.clipboard.writeText(text),
-    JSON.stringify(data({ nodes, edges: [] })),
-  );
-  await page.locator("#input").focus();
-  await page.keyboard.press("Control+V");
+  const text = JSON.stringify(data({ nodes, edges: [] }));
+  if (browserName === "chromium") {
+    await page
+      .context()
+      .grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.evaluate((text) => navigator.clipboard.writeText(text), text);
+    await page.locator("#input").focus();
+    await page.keyboard.press("Control+V");
+  } else {
+    await page.locator("#input").evaluate((input, text) => {
+      const event = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", {
+        value: { getData: (type) => (type === "text/plain" ? text : "") },
+      });
+      input.dispatchEvent(event);
+    }, text);
+  }
   await expect(page.locator("#importText")).toHaveAttribute("readonly", "");
   await expect(page.locator("#importTextHint")).toContainText("完整原文");
   await expect(page.locator("#applyImport")).toBeEnabled();
@@ -555,7 +566,7 @@ test("another open page pauses autosave and asks before overwriting shared stora
   await importData(page);
   await save(page);
   const other = await context.newPage();
-  await other.goto("/web/");
+  await other.goto("web/");
   await expect(other.locator("body")).toHaveAttribute("data-ready", "true");
   await tools(other);
   await other.locator("#saveBtn").click();
@@ -621,14 +632,15 @@ test("background layout failure leaves the searchable library usable and visible
   await page.locator("#tab-list").click();
   await expect(page.locator(".memory-card")).toHaveCount(8);
 });
-test("wheel and two-finger gestures change the viewport without changing graph data", async ({
+test("viewport zoom inputs preserve graph data", async ({
   page,
   isMobile,
+  browserName,
 }) => {
   await importData(page);
   const before = await page.locator("#zoomValue").textContent(),
     rect = await page.locator("#sky").boundingBox();
-  if (isMobile) {
+  if (isMobile && browserName === "chromium") {
     const session = await page.context().newCDPSession(page),
       y = rect.y + rect.height * 0.45,
       x = rect.x + rect.width / 2;
@@ -651,6 +663,8 @@ test("wheel and two-finger gestures change the viewport without changing graph d
       touchPoints: [],
     });
     await session.detach();
+  } else if (isMobile) {
+    await page.locator("#zoomIn").tap();
   } else {
     await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
     await page.mouse.wheel(0, -160);

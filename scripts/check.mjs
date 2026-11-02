@@ -1,6 +1,7 @@
 import { readdir, readFile, access } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
+import { parseDocument } from "yaml";
 async function checkDirectory(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = directory + "/" + entry.name;
@@ -39,3 +40,15 @@ for (const file of ["app.mjs", "import-ui.mjs", "backup-ui.mjs"]) {
       throw new Error(file + " references missing element " + match[1]);
 }
 console.log("Page IDs, labels, controls, and script bindings checked.");
+
+for (const entry of await readdir(".github/workflows")) {
+  if (!/\.ya?ml$/.test(entry)) continue;
+  const document = parseDocument(
+    await readFile(".github/workflows/" + entry, "utf8"),
+    { uniqueKeys: true },
+  );
+  if (document.errors.length)
+    throw new Error(document.errors.map((error) => error.message).join("\n"));
+  document.toJS({ maxAliasCount: 0 });
+}
+console.log("Workflow YAML checked.");

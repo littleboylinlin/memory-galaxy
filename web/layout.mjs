@@ -55,20 +55,18 @@ export function clusterGraph(nodes, edges, by = "type") {
           ? "全部"
           : node.type,
   );
-  const groups = [...new Set(keys)]
-    .sort()
-    .map((key) => ({
-      key,
-      label:
-        by === "type"
-          ? GROUP_NAMES[key] || key
-          : by === "component"
-            ? "连通星团"
-            : key,
-      count: 0,
-      x: 0,
-      y: 0,
-    }));
+  const groups = [...new Set(keys)].sort().map((key) => ({
+    key,
+    label:
+      by === "type"
+        ? GROUP_NAMES[key] || key
+        : by === "component"
+          ? "连通星团"
+          : key,
+    count: 0,
+    x: 0,
+    y: 0,
+  }));
   const groupIndex = new Map(groups.map((group, index) => [group.key, index]));
   const assignments = Uint32Array.from(keys, (key) => groupIndex.get(key));
   for (const index of assignments) groups[index].count++;

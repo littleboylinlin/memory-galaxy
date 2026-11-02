@@ -33,7 +33,7 @@ npm run dev
 - IndexedDB 主动保存、可选自动保存、旧缓存迁移、多页面写入提醒和缓存清除
 - 小屏工具抽屉、键盘操作、原生弹窗和减少动态效果设置
 
-GitHub Actions CI、更多浏览器矩阵和 GitHub Pages 部署仍留待下一轮。
+已提供 GitHub Actions 检查、四个浏览器项目和 Pages 发布流程。生产发布只从 main 执行；首次需在仓库 Settings → Pages 中选择 GitHub Actions。线上状态以部署及发布后校验结果为准，配置文件存在不代表已经上线。
 
 ## 协议与数据
 
@@ -43,6 +43,8 @@ GitHub Actions CI、更多浏览器矩阵和 GitHub Pages 部署仍留待下一�
 - [产品导出提示词](protocol/export-prompt-zh.txt)
 - [星盘操作、保存与备份说明](docs/WORKSPACE.md)
 - [源码与数据路径审计](docs/AUDIT.md)
+- [开发与贡献](CONTRIBUTING.md)
+- [CI、构建校验与 Pages 部署](docs/DEPLOYMENT.md)
 
 关系来自导入数据或用户明确创建，页面不会自行补充。`full` 是导出方的声明，无法证明已读取某个平台的全部记忆。所有正文、指令和 URL 都作为不可信文本处理，不会执行。
 
@@ -60,20 +62,22 @@ npm run check
 npm test
 ```
 
-首次运行浏览器测试需安装 Chromium：
+首次运行浏览器测试需安装测试浏览器：
 
 ```bash
-npx playwright install chromium --only-shell
+npx playwright install --with-deps
 npm run test:e2e
 ```
 
-浏览器测试包含桌面及手机尺寸的 Chromium。默认启动本地静态服务器；已有服务器时，可设置 `PLAYWRIGHT_BASE_URL`；已有 Chromium 可执行文件可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指定，额外启动参数通过 `PLAYWRIGHT_CHROMIUM_ARGS` 的 JSON 数组提供。测试不连接模型，也不使用真实个人记忆。测试依赖与浏览器可在开发机器上安装，运行应用无需它们。
+浏览器测试包含桌面 Chromium、手机尺寸 Chromium、桌面 Firefox 和手机尺寸 WebKit。测试前会构建站点，随后从 `/memory-galaxy/` 子路径验证 `dist/`。已有站点时，可设置 `PLAYWRIGHT_BASE_URL`；已有 Chromium 可执行文件可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指定，额外启动参数通过 `PLAYWRIGHT_CHROMIUM_ARGS` 的 JSON 数组提供，这些覆盖只影响 Chromium。测试不连接模型，也不使用真实个人记忆。测试依赖与浏览器可在开发机器上安装，运行应用无需它们。
 
 ```bash
 npm run build
 ```
 
-构建仅将页面、协议和许可证复制到 `dist/`。没有将测试报告、源码仓库元数据或开发依赖放入静态产物。
+构建将页面、协议、图标和许可证复制到 `dist/`，生成包含 revision、文件大小和 SHA-256 的构建清单，并验证产物。未知文件、符号链接、测试报告、仓库元数据和开发依赖不会进入静态站点。运行 `npm run verify:build` 可复核完整性，`npm run preview` 可在 `http://localhost:4173/memory-galaxy/` 查看产物。
+
+CI 在 Node.js 22、24 和四个浏览器项目通过后生成复核产物。main 的发布作业使用最小 Pages / OIDC 权限，再通过线上文件和浏览器检查验收。详细命令、首次启用与回退步骤见 [部署说明](docs/DEPLOYMENT.md)。
 
 ## 致谢与许可
 

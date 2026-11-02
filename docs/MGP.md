@@ -52,17 +52,17 @@ JSON Schema 位于 [mgp.schema.json](../protocol/mgp.schema.json)。Schema 检�
 
 可选字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `content` | 文本，最长 100,000 字符 |
-| `tags` | 最多 100 个非空标签，每项最长 100 字符 |
-| `state` | confirmed / inferred / deprecated / disputed / unknown |
-| `updated_at` | 带时区、精确到秒的 ISO 8601 日期时间，可带小数秒 |
-| `revision` | 来源维护的正安全整数版本号 |
-| `source_id`、`source_ref` | 已声明的来源 ID 与可追溯引用 |
-| `provenance` | 多条来源引用，格式见下文 |
-| `sensitive` | 布尔标记；不会自动加密内容 |
-| `extensions` | 自定义 JSON 对象 |
+| 字段                      | 含义                                                   |
+| ------------------------- | ------------------------------------------------------ |
+| `content`                 | 文本，最长 100,000 字符                                |
+| `tags`                    | 最多 100 个非空标签，每项最长 100 字符                 |
+| `state`                   | confirmed / inferred / deprecated / disputed / unknown |
+| `updated_at`              | 带时区、精确到秒的 ISO 8601 日期时间，可带小数秒       |
+| `revision`                | 来源维护的正安全整数版本号                             |
+| `source_id`、`source_ref` | 已声明的来源 ID 与可追溯引用                           |
+| `provenance`              | 多条来源引用，格式见下文                               |
+| `sensitive`               | 布尔标记；不会自动加密内容                             |
+| `extensions`              | 自定义 JSON 对象                                       |
 
 关系必须有 `from`、`to`、`type`、`basis`。端点必须存在于本批节点或当前工作区，且不能同时被本批删除。`basis` 为 `explicit`、`inferred` 或 `rule`；可用 `evidence` 保存依据，最长 10,000 字符。关系同样支持 `updated_at`、`revision`、`source_id`、`source_ref`、`provenance` 和 `extensions`。
 
@@ -79,7 +79,7 @@ JSON Schema 位于 [mgp.schema.json](../protocol/mgp.schema.json)。Schema 检�
   "source_id": "notes:conversation:stable-key",
   "source_ref": "message:12",
   "provenance": [
-    {"source_id":"notes:conversation:stable-key","ref":"message:12"}
+    { "source_id": "notes:conversation:stable-key", "ref": "message:12" }
   ]
 }
 ```
@@ -94,11 +94,11 @@ JSON Schema 位于 [mgp.schema.json](../protocol/mgp.schema.json)。Schema 检�
 
 同身份记录内容有变化时，默认不应用，进入冲突预览。可逐项选择，也可批量选择：
 
-| 策略 | 行为 |
-| --- | --- |
-| 逐项确认 | 所有冲突明确处理后才允许确认 |
-| 保留当前 | 保留当前记录；不丢弃其他无冲突的新记录 |
-| 采用导入 | 应用导入方提供的字段 |
+| 策略     | 行为                                                        |
+| -------- | ----------------------------------------------------------- |
+| 逐项确认 | 所有冲突明确处理后才允许确认                                |
+| 保留当前 | 保留当前记录；不丢弃其他无冲突的新记录                      |
+| 采用导入 | 应用导入方提供的字段                                        |
 | 较新版本 | 同来源先比较双方都有的 revision，否则比较双方都有的更新时间 |
 
 不同来源的 revision 不可比较。版本号相同，或时间相同、缺失时，不推断哪一条更正确，仍需逐项确认。来源元数据的“较新”使用 `exported_at`；扩展值没有可比较时间，仍需确认。
@@ -121,12 +121,22 @@ JSON Schema 位于 [mgp.schema.json](../protocol/mgp.schema.json)。Schema 检�
 {
   "protocol": "mgp/1.1",
   "mode": "delta",
-  "source": {"id":"notes:conversation:stable-key","completeness":"partial"},
+  "source": {
+    "id": "notes:conversation:stable-key",
+    "completeness": "partial"
+  },
   "nodes": [],
   "edges": [],
   "deleted": {
-    "nodes": [{"id":"notes:memory:stable-key","deleted_at":"2026-01-02T10:00:00Z"}],
-    "edges": [{"id":"notes:relation:stable-key","deleted_at":"2026-01-02T10:00:00Z"}]
+    "nodes": [
+      { "id": "notes:memory:stable-key", "deleted_at": "2026-01-02T10:00:00Z" }
+    ],
+    "edges": [
+      {
+        "id": "notes:relation:stable-key",
+        "deleted_at": "2026-01-02T10:00:00Z"
+      }
+    ]
   }
 }
 ```
