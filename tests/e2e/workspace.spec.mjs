@@ -544,15 +544,11 @@ test("bulk pasted JSON avoids wrapping large single lines and remains importable
     await page.keyboard.press("Control+V");
   } else {
     await page.locator("#input").evaluate((input, text) => {
-      const clipboard = new DataTransfer();
-      clipboard.setData("text/plain", text);
-      input.dispatchEvent(
-        new ClipboardEvent("paste", {
-          clipboardData: clipboard,
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
+      const event = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", {
+        value: { getData: (type) => (type === "text/plain" ? text : "") },
+      });
+      input.dispatchEvent(event);
     }, text);
   }
   await expect(page.locator("#importText")).toHaveAttribute("readonly", "");
@@ -636,7 +632,7 @@ test("background layout failure leaves the searchable library usable and visible
   await page.locator("#tab-list").click();
   await expect(page.locator(".memory-card")).toHaveCount(8);
 });
-test("wheel and two-finger gestures change the viewport without changing graph data", async ({
+test("viewport zoom inputs preserve graph data", async ({
   page,
   isMobile,
   browserName,
@@ -667,6 +663,8 @@ test("wheel and two-finger gestures change the viewport without changing graph d
       touchPoints: [],
     });
     await session.detach();
+  } else if (isMobile) {
+    await page.locator("#zoomIn").tap();
   } else {
     await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
     await page.mouse.wheel(0, -160);

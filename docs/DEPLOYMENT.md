@@ -15,7 +15,7 @@ npx playwright install --with-deps
 npm run test:e2e
 ```
 
-`--with-deps` 用于 Linux 测试机的系统依赖安装；其他平台可使用 `npx playwright install`。完整浏览器矩阵为桌面 Chromium、手机尺寸 Chromium、桌面 Firefox、手机尺寸 WebKit。手机尺寸是浏览器模拟，不代表真实设备认证。双指手势通过 Chromium 的触摸输入接口验证；其他引擎验证滚轮缩放。Chromium 测试使用实际剪贴板，其余引擎用剪贴板事件验证大批次粘贴处理。
+`--with-deps` 用于 Linux 测试机的系统依赖安装；其他平台可使用 `npx playwright install`。完整浏览器矩阵为桌面 Chromium、手机尺寸 Chromium、桌面 Firefox、手机尺寸 WebKit。手机尺寸是浏览器模拟，不代表真实设备认证。双指手势通过 Chromium 的触摸输入接口验证；桌面 Firefox 验证滚轮缩放，手机尺寸 WebKit 验证缩放控件的触摸操作。Chromium 测试使用实际剪贴板，其余引擎使用带剪贴板数据的合成事件验证大批次粘贴处理；这不等于验证其操作系统剪贴板或真实手机手势。
 
 浏览器测试的 npm 前置步骤会先构建应用。测试服务器只提供 `dist/` 中的公开文件，并挂载到 `/memory-galaxy/`，用于发现项目站点子路径中的资源引用问题。测试服务器不会复用同端口的其他进程。
 
