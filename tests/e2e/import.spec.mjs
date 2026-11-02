@@ -48,7 +48,7 @@ async function exported(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/web/");
+  await page.goto("web/");
   await expect(page.locator("#nodeCount")).toHaveText("8");
   await toolsPanel(page);
 });

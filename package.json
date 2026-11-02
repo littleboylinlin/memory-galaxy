@@ -1,6 +1,6 @@
 {
   "name": "memory-galaxy",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -9,7 +9,14 @@
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs tests/test-mgp.mjs",
     "test:e2e": "playwright test",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "preview": "node scripts/serve.mjs --root dist --base-path /memory-galaxy/",
+    "pretest:e2e": "npm run build",
+    "test:smoke": "playwright test --grep @deployment",
+    "verify:build": "node scripts/verify-build.mjs",
+    "verify:site": "node scripts/verify-site.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "engines": {
     "node": ">=22"
@@ -17,6 +24,8 @@
   "devDependencies": {
     "@playwright/test": "1.62.1",
     "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "prettier": "3.9.10",
+    "yaml": "2.9.1"
   }
 }

@@ -1,0 +1,166 @@
+name: Checks and Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  checks:
+    name: Node ${{ matrix.node }} checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm run verify:build -- --revision "$GITHUB_SHA"
+
+  browsers:
+    name: ${{ matrix.project }}
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: desktop-chromium
+            browser: chromium
+          - project: mobile-chromium
+            browser: chromium
+          - project: desktop-firefox
+            browser: firefox
+          - project: mobile-webkit
+            browser: webkit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps "${{ matrix.browser }}"
+      - run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+      - run: npm run test:e2e -- --project="${{ matrix.project }}"
+      - name: Preserve browser reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  package:
+    name: Verified site artifact
+    needs: [checks, browsers]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run verify:build -- --revision "$GITHUB_SHA"
+      - name: Upload review artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-dist
+          path: dist/
+          include-hidden-files: true
+          retention-days: 7
+      - name: Upload Pages artifact
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist/
+          include-hidden-files: true
+
+  pages:
+    name: Deploy GitHub Pages
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Publish site
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  live:
+    name: Verify published site
+    needs: pages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SITE_URL: ${{ needs.pages.outputs.url }}
+      EXPECTED_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run verify:site -- --url "$SITE_URL" --revision "$EXPECTED_REVISION" --manifest dist/build-info.json --attempts 6
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+      - name: Browser smoke checks on Pages
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ env.SITE_URL }}
+        run: npm run test:smoke -- --project=desktop-chromium --project=mobile-chromium
+      - name: Preserve deployment check reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pages-browser-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
