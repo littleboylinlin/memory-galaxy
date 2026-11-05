@@ -173,6 +173,35 @@ test("JSONL refuses extra record fields and repeated headers", () => {
       MgpError,
     );
 });
+test("JSONL record kinds require exact strings and reject inherited property names with locations", () => {
+  const header = JSON.stringify({
+    kind: "header",
+    protocol: PROTOCOL,
+    source: { id: "test:source" },
+  });
+  for (const kind of [
+    ["node"],
+    ["edge"],
+    ["delete_node"],
+    ["delete_edge"],
+    "constructor",
+    "__proto__",
+    "toString",
+    "hasOwnProperty",
+    {},
+    null,
+    1,
+  ])
+    assert.throws(
+      () => parseMgp(header + "\n" + JSON.stringify({ kind, value: node() })),
+      (error) =>
+        error instanceof MgpError &&
+        error.issues[0].path === "kind" &&
+        error.issues[0].line === 2 &&
+        error.issues[0].column === 1,
+      JSON.stringify(kind),
+    );
+});
 test("BOM and blank JSONL lines are accepted without changing line offsets", () => {
   const data = "\uFEFF\n" + stringifyMgp(batch([node()]), "jsonl");
   assert.equal(parseMgp(data).graph.nodes[0].id, "test:one");
@@ -450,6 +479,113 @@ test("exported merged graphs preserve all source coverage declarations", () => {
   const parsed = parseMgp(stringifyMgp(merged)).graph;
   assert.equal(graphSources(parsed).length, 2);
   assert.equal(parsed.source.completeness, "unknown");
+});
+test("workspace-shaped source IDs retain their declarations and stable record references", () => {
+  for (const id of ["workspace:local", "workspace:local:1"]) {
+    const source = {
+      id,
+      platform: "notes",
+      scope: "实际可访问的笔记",
+      completeness: "partial",
+    };
+    const incoming = batch([node("notes:one", { source_ref: "note:1" })], [], {
+      source,
+      deleted: { nodes: [{ id: "notes:gone", deleted_at: t1 }] },
+    });
+    const graph = mergeMgp(null, incoming);
+    assert.deepEqual(graphSources(graph), [source]);
+    assert.notEqual(graph.source.id, id);
+    assert.equal(graph.nodes[0].source_id, id);
+    assert.deepEqual(graph.nodes[0].provenance, [
+      { source_id: id, ref: "note:1" },
+    ]);
+    assert.equal(graph.deleted.nodes[0].source_id, id);
+    assert.equal(validateMgp(graph).ok, true);
+    assert.deepEqual(graphSources(parseMgp(stringifyMgp(graph)).graph), [
+      source,
+    ]);
+  }
+});
+test("canonical workspace sources remain visible when records inherit or reference them", () => {
+  const source = emptyGraph().source;
+  for (const incoming of [
+    { ...emptyGraph(), nodes: [node()] },
+    { ...emptyGraph(), nodes: [node("test:one", { source_id: source.id })] },
+    {
+      ...emptyGraph(),
+      sources: [{ id: "test:other" }],
+      nodes: [
+        node("test:one", {
+          source_id: "test:other",
+          provenance: [{ source_id: source.id }],
+        }),
+      ],
+    },
+    {
+      ...emptyGraph(),
+      deleted: { nodes: [{ id: "test:gone", deleted_at: t1 }] },
+    },
+    {
+      ...emptyGraph(),
+      deleted: {
+        edges: [{ id: "test:gone", deleted_at: t1, source_id: source.id }],
+      },
+    },
+  ]) {
+    const graph = mergeMgp(null, incoming);
+    assert.deepEqual(
+      graphSources(graph).find((s) => s.id === source.id),
+      source,
+    );
+    assert.notEqual(graph.source.id, source.id);
+    assert.equal(validateMgp(graph).ok, true);
+  }
+});
+test("aggregate sources stay out of provenance across repeated imports and namespace collisions", () => {
+  let graph = emptyGraph();
+  const declarations = [];
+  for (const [index, id] of [
+    "workspace:local",
+    "workspace:local:1",
+    "workspace:local:2",
+  ].entries()) {
+    const source = { id, scope: "笔记来源 " + index };
+    declarations.push(source);
+    graph = mergeMgp(graph, batch([node("notes:" + index)], [], { source }));
+  }
+  assert.equal(graph.source.id, "workspace:local:3");
+  assert.deepEqual(graphSources(graph), declarations);
+  for (let count = 0; count < 3; count++) {
+    const replay = parseMgp(stringifyMgp(graph, "jsonl")).graph;
+    graph = mergeMgp(graph, replay);
+    assert.equal(graph.source.id, "workspace:local:3");
+    assert.deepEqual(graphSources(graph), declarations);
+    assert.equal(graph.nodes.length, 3);
+  }
+  assert.deepEqual(graphSources(emptyGraph()), []);
+});
+test("workspace-shaped source metadata changes still require an explicit conflict decision", () => {
+  const original = batch([node()], [], {
+    source: { id: "workspace:local", scope: "原始范围" },
+  });
+  const graph = mergeMgp(null, original);
+  const incoming = {
+    ...original,
+    source: { ...original.source, scope: "变更范围" },
+  };
+  const plan = planImport(graph, incoming);
+  assert.equal(plan.canApply, false);
+  assert.equal(plan.conflicts[0].kind, "source");
+  assert.equal(
+    graphSources(planImport(graph, incoming, { policy: "keep" }).graph)[0]
+      .scope,
+    "原始范围",
+  );
+  assert.equal(
+    graphSources(planImport(graph, incoming, { policy: "incoming" }).graph)[0]
+      .scope,
+    "变更范围",
+  );
 });
 test("aggregate limits apply to the final graph, not only individual batches", () => {
   const many = Array.from({ length: 50000 }, (_, i) => node("test:" + i));

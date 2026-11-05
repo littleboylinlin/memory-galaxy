@@ -127,6 +127,12 @@ const fields = {
     "source_ref",
   ],
 };
+const WORKSPACE_SOURCE = {
+  id: "workspace:local",
+  platform: "local",
+  scope: "当前工作区",
+  completeness: "unknown",
+};
 export class MgpError extends Error {
   constructor(issues) {
     super(
@@ -636,7 +642,10 @@ export function parseMgp(input, knownIds = []) {
         delete_node: ["deleted", "nodes"],
         delete_edge: ["deleted", "edges"],
       };
-      const path = targets[record.kind];
+      const path =
+        typeof record.kind === "string" && own(targets, record.kind)
+          ? targets[record.kind]
+          : undefined;
       if (!path)
         throw new MgpError([
           {
@@ -763,12 +772,7 @@ export function stringifyMgp(graph, format = "json") {
 export function emptyGraph() {
   return {
     protocol: PROTOCOL,
-    source: {
-      id: "workspace:local",
-      platform: "local",
-      scope: "当前工作区",
-      completeness: "unknown",
-    },
+    source: { ...WORKSPACE_SOURCE },
     sources: [],
     nodes: [],
     edges: [],
@@ -777,9 +781,29 @@ export function emptyGraph() {
 }
 export function graphSources(graph) {
   const sources = new Map((graph?.sources || []).map((s) => [s.id, s]));
-  if (graph?.source && graph.source.id !== "workspace:local")
+  if (graph?.source && !isAggregateSource(graph))
     sources.set(graph.source.id, graph.source);
   return [...sources.values()];
+}
+function isAggregateSource(graph) {
+  const source = graph.source;
+  if (
+    !/^workspace:local(?::[1-9]\d*)?$/.test(source.id) ||
+    !equal(source, { ...WORKSPACE_SOURCE, id: source.id })
+  )
+    return false;
+  return [
+    graph.nodes || [],
+    graph.edges || [],
+    graph.deleted?.nodes || [],
+    graph.deleted?.edges || [],
+  ].every((records) =>
+    records.every(
+      (record) =>
+        (record.source_id || source.id) !== source.id &&
+        !record.provenance?.some((item) => item.source_id === source.id),
+    ),
+  );
 }
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -1043,8 +1067,13 @@ export function planImport(
       continue;
     sources.set(s.id, structuredClone(s));
   }
+  let workspaceSourceId = WORKSPACE_SOURCE.id,
+    suffix = 0;
+  while (sources.has(workspaceSourceId))
+    workspaceSourceId = WORKSPACE_SOURCE.id + ":" + ++suffix;
   const graph = {
     ...emptyGraph(),
+    source: { ...WORKSPACE_SOURCE, id: workspaceSourceId },
     sources: [...sources.values()],
     nodes: [...nodes.values()],
     edges: [...edges.values()],

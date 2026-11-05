@@ -353,3 +353,51 @@ test("changes to the same source declaration also require review", async ({
   await page.locator("#applyImport").click();
   expect((await exported(page)).sources[0].scope).toBe("测试数据");
 });
+
+test("workspace source ID collisions preserve coverage in preview, export and repeated imports", async ({
+  page,
+}) => {
+  const source = {
+    id: "workspace:local",
+    platform: "notes",
+    scope: "实际可访问的笔记",
+    completeness: "partial",
+  };
+  await preview(page, batch([node()], [], { source }));
+  await expect(page.locator("#previewSources")).toContainText(source.scope);
+  await expect(page.locator("#previewSources")).toContainText(source.id);
+  await expect(page.locator("#applyImport")).toBeEnabled();
+  await page.locator("#applyImport").click();
+  await expect(page.locator("#sourceCount")).toHaveText("1");
+  const graph = await exported(page);
+  expect(graph.sources).toEqual([source]);
+  expect(graph.source.id).toBe("workspace:local:1");
+  expect(graph.nodes[0].source_id).toBe(source.id);
+  await apply(page, graph);
+  await expect(page.locator("#nodeCount")).toHaveText("1");
+  await expect(page.locator("#sourceCount")).toHaveText("1");
+  expect((await exported(page)).sources).toEqual([source]);
+});
+
+test("invalid JSONL record kinds show their line and leave the graph unchanged", async ({
+  page,
+}) => {
+  const header = JSON.stringify({
+    kind: "header",
+    protocol: PROTOCOL,
+    source: { id: "test:source" },
+  });
+  for (const kind of [["node"], "constructor", "__proto__"]) {
+    await preview(
+      page,
+      header + "\n" + JSON.stringify({ kind, value: node() }),
+    );
+    await expect(page.locator("#importErrors")).toContainText(
+      "第 2 行，第 1 列",
+    );
+    await expect(page.locator("#importErrors")).toContainText("kind:");
+    await expect(page.locator("#applyImport")).toBeDisabled();
+    await expect(page.locator("#nodeCount")).toHaveText("8");
+    await page.locator("#cancelImport").click();
+  }
+});
