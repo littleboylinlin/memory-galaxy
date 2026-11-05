@@ -304,7 +304,8 @@ export function validateMgp(value, knownIds = []) {
     shape(value.deleted, "deleted", "deleted")
   ) {
     for (const kind of ["nodes", "edges"]) {
-      const items = value.deleted[kind] ?? [];
+      const items =
+        value.deleted[kind] === undefined ? [] : value.deleted[kind];
       if (
         !Array.isArray(items) ||
         items.length > (kind === "nodes" ? LIMITS.nodes : LIMITS.edges)
@@ -839,6 +840,13 @@ function withProvenance(record, sourceId, existing) {
   next.provenance = [...provenance.values()];
   return next;
 }
+function updatedRecord(previous, next) {
+  const merged = { ...previous, ...next };
+  if (previous.source_id !== next.source_id)
+    for (const key of ["source_ref", "revision"])
+      if (!own(next, key)) delete merged[key];
+  return withProvenance(merged, next.source_id, previous);
+}
 function compareVersion(incoming, existing, deletion = false) {
   if (deletion) {
     const a = incoming.deleted_at || incoming.updated_at,
@@ -951,10 +959,7 @@ export function planImport(
         continue;
       }
       if (!resolve("node", n.id, previous, next)) continue;
-      nodes.set(
-        n.id,
-        withProvenance({ ...previous, ...next }, next.source_id, previous),
-      );
+      nodes.set(n.id, updatedRecord(previous, next));
       stats.updatedNodes++;
     } else {
       nodes.set(n.id, next);
@@ -1025,10 +1030,7 @@ export function planImport(
         continue;
       }
       if (!resolve("edge", key, previous, next)) continue;
-      edges.set(
-        key,
-        withProvenance({ ...previous, ...next }, next.source_id, previous),
-      );
+      edges.set(key, updatedRecord(previous, next));
       stats.updatedEdges++;
     } else {
       edges.set(key, next);

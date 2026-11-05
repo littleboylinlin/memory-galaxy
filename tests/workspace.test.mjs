@@ -317,3 +317,30 @@ test("loading saved workspaces preserves their operation timeline without adding
   assert.deepEqual(loaded.snapshots, backup.snapshots);
   assert.equal(validateBackup(loaded.backup()), true);
 });
+
+test("manual edits do not relabel original node and edge references as local references", () => {
+  const value = graph();
+  delete value.nodes[0].provenance;
+  value.edges[0].source_ref = "original:edge";
+  const w = workspace(value);
+  w.editNode("a", { content: "手动修改" });
+  const edited = w.graph.nodes[0];
+  assert.equal(edited.source_ref || "", "");
+  assert.ok(
+    edited.provenance.some(
+      (p) => p.source_id === "original" && p.ref === "doc:1",
+    ),
+  );
+  assert.ok(
+    !edited.provenance.some(
+      (p) => p.source_id === "local:edits" && p.ref === "doc:1",
+    ),
+  );
+  w.editEdge(edgeKey(w.graph.edges[0]), { evidence: "重新核实" });
+  assert.equal(w.graph.edges[0].source_ref || "", "");
+  assert.ok(
+    w.graph.edges[0].provenance.some(
+      (p) => p.source_id === "original" && p.ref === "original:edge",
+    ),
+  );
+});

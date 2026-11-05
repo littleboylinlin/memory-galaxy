@@ -405,17 +405,21 @@ export class Sky {
       ctx.stroke();
       return true;
     };
-    for (
-      let index = 0;
-      index < this.edges.length && edgeCount < edgeBudget;
-      index++
-    ) {
+    let edgeLimited = false;
+    for (let index = 0; index < this.edges.length; index++) {
       if (selectedEdges.has(index)) continue;
+      if (edgeCount >= edgeBudget) {
+        edgeLimited = true;
+        break;
+      }
       if (drawEdge(index)) edgeCount++;
     }
     let relatedCount = 0;
     for (const index of selectedEdges) {
-      if (relatedCount >= 3000) break;
+      if (relatedCount >= 3000) {
+        edgeLimited = true;
+        break;
+      }
       if (drawEdge(index)) {
         relatedCount++;
         edgeCount++;
@@ -538,7 +542,7 @@ export class Sky {
       totalEdges: this.edges.length,
       filtered: this.filter.reduce((sum, value) => sum + value, 0),
       active: this.active,
-      aggregated: drawn < visible.length || this.edges.length > edgeCount,
+      aggregated: drawn < visible.length || edgeLimited,
     });
   }
   bind() {
