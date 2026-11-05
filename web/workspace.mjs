@@ -47,6 +47,25 @@ function editSource(graph) {
   while (ids.has(id)) id = manualTemplate.id + ":" + ++suffix;
   return { ...manualTemplate, id };
 }
+function editFields(current, patch, graph, source) {
+  return {
+    ...current,
+    ...patch,
+    source_ref: Object.hasOwn(patch, "source_ref")
+      ? patch.source_ref
+      : (current.source_id || graph.source.id) === source.id
+        ? current.source_ref || ""
+        : "",
+    provenance: [
+      ...(current.provenance || []),
+      {
+        source_id: current.source_id || graph.source.id,
+        ...(current.source_ref ? { ref: current.source_ref } : {}),
+      },
+    ],
+    source_id: source.id,
+  };
+}
 function assertGraph(graph) {
   const result = validateMgp(graph);
   if (!result.ok) throw new Error(result.errors.join("\n"));
@@ -207,6 +226,12 @@ export class Workspace extends EventTarget {
       new CustomEvent("change", { detail: { label, version: this.version } }),
     );
   }
+  editableReference(record) {
+    return (record.source_id || this.graph.source.id) ===
+      editSource(this.graph).id
+      ? record.source_ref || ""
+      : "";
+  }
   capture(label, kind = "before") {
     this.pruned = 0;
     if (this.demo) return;
@@ -290,10 +315,8 @@ export class Workspace extends EventTarget {
     if (patch.id && patch.id !== id) throw new Error("不能修改现有稳定 ID");
     const source = editSource(this.graph);
     const next = {
-      ...current,
-      ...patch,
+      ...editFields(current, patch, this.graph, source),
       id,
-      source_id: source.id,
       updated_at: this.now(),
       revision:
         current.source_id === source.id ? (current.revision || 0) + 1 : 1,
@@ -357,17 +380,8 @@ export class Workspace extends EventTarget {
       throw new Error("相同关系已存在");
     const source = editSource(this.graph);
     const next = {
-      ...current,
-      ...patch,
+      ...editFields(current, patch, this.graph, source),
       id: current.id || this.id("edge"),
-      provenance: [
-        ...(current.provenance || []),
-        {
-          source_id: current.source_id || this.graph.source.id,
-          ...(current.source_ref ? { ref: current.source_ref } : {}),
-        },
-      ],
-      source_id: source.id,
       updated_at: this.now(),
       revision:
         current.source_id === source.id ? (current.revision || 0) + 1 : 1,

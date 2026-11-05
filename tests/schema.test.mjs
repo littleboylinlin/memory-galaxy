@@ -127,3 +127,11 @@ test("Schema and runtime accept legacy custom fields for lossless migration", ()
   both(graph, true);
   both(mergeMgp(null, graph), true);
 });
+
+test("Schema and runtime reject null deletion arrays", () => {
+  for (const kind of ["nodes", "edges"]) {
+    const graph = emptyGraph();
+    graph.deleted = { [kind]: null };
+    both(graph, false);
+  }
+});

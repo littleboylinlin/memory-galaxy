@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { syntheticGraph } from "../fixtures/synthetic.mjs";
+import { stringifyMgp } from "../../web/mgp.mjs";
 const data = (extra = {}) => ({
   protocol: "mgp/1.1",
   source: {
@@ -374,6 +376,9 @@ test("search locates exact results, filters state, and can focus a star", async 
   await page.locator("#searchResults button").click();
   await expect(page.locator("#detailTitle")).toHaveText("离线工具");
   await expect(page.locator("#detailTitle")).toBeFocused();
+  await expect(page.locator("#renderStatus")).not.toContainText(
+    "部分细节已省略",
+  );
   await page.locator("#closeInspector").click();
   await tools(page);
   await page.locator("#search").fill("");
@@ -696,4 +701,246 @@ test("fit includes valid distant restored positions without discarding pins", as
       (position) => position.pinned,
     ),
   ).toBe(true);
+});
+
+test("atomic storage checks reject concurrent saves and stale writes after clearing", async ({
+  page,
+}) => {
+  await importData(page);
+  const backup = await download(page, "backupBtn");
+  const result = await page.evaluate(async (backup) => {
+    const storage = await import("./storage.mjs");
+    const other = structuredClone(backup);
+    other.graph.nodes[0].label = "另一份合成保存";
+    const results = await Promise.allSettled([
+      storage.saveWorkspace(backup, false, null),
+      storage.saveWorkspace(other, false, null),
+    ]);
+    const saved = await storage.loadWorkspace();
+    const cleared = await storage.clearWorkspaceStorage(saved.revision);
+    let stale;
+    try {
+      await storage.saveWorkspace(backup, true, saved.revision);
+    } catch (error) {
+      stale = error.name;
+    }
+    const empty = await storage.loadWorkspace();
+    const migrated = await storage.saveWorkspace(backup, false, cleared);
+    return {
+      statuses: results.map((r) => r.status),
+      errors: results
+        .filter((r) => r.status === "rejected")
+        .map((r) => r.reason.name),
+      stale,
+      empty: !empty.backup,
+      changed: saved.revision !== cleared,
+      migrated: migrated !== cleared,
+    };
+  }, backup);
+  expect(result.statuses.sort()).toEqual(["fulfilled", "rejected"]);
+  expect(result.errors).toEqual(["StorageConflictError"]);
+  expect(result.stale).toBe("StorageConflictError");
+  expect(result.empty && result.changed && result.migrated).toBe(true);
+});
+
+test("stale pages cannot overwrite without confirmation when change notifications are unavailable", async ({
+  page,
+  context,
+}) => {
+  await context.addInitScript(() => {
+    window.BroadcastChannel = class {
+      constructor() {
+        throw new Error("No notifications in this test");
+      }
+    };
+  });
+  await page.reload();
+  await expect(page.locator("body")).toHaveAttribute("data-ready", "true");
+  await importData(page);
+  const other = await context.newPage();
+  await other.goto("web/");
+  await expect(other.locator("body")).toHaveAttribute("data-ready", "true");
+  await save(page);
+  const changed = data();
+  changed.nodes[0].label = "旧页面待保存记忆";
+  await importData(other, changed);
+  await tools(other);
+  await other.locator("#saveBtn").click();
+  await expect(other.locator("#notice")).toContainText("保存失败");
+  expect((await download(other)).nodes[0].label).toBe("旧页面待保存记忆");
+  expect(
+    await page.evaluate(
+      async () =>
+        (await (await import("./storage.mjs")).loadWorkspace()).backup.graph
+          .nodes[0].label,
+    ),
+  ).toBe("阅读记录");
+  await other.locator("#saveBtn").click();
+  await expect(other.locator("#confirmTitle")).toHaveText("覆盖另一页面的保存");
+  await other.locator("#cancelAction").click();
+  await other.locator("#saveBtn").click();
+  await other.locator("#confirmAction").click();
+  await expect(other.locator("#notice")).toContainText("已保存到这个浏览器");
+  expect(
+    await page.evaluate(
+      async () =>
+        (await (await import("./storage.mjs")).loadWorkspace()).backup.graph
+          .nodes[0].label,
+    ),
+  ).toBe("旧页面待保存记忆");
+  await other.close();
+});
+
+test("legacy IndexedDB saves migrate only after an explicit save", async ({
+  page,
+}) => {
+  await importData(page);
+  const backup = await download(page, "backupBtn");
+  await page.evaluate(
+    (backup) =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open("memory-galaxy", 1);
+        request.onsuccess = () => {
+          const db = request.result,
+            tx = db.transaction("workspace", "readwrite");
+          tx.objectStore("workspace").put(
+            { backup, autosave: false },
+            "current",
+          );
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    backup,
+  );
+  await page.reload();
+  await expect(page.locator("#nodeCount")).toHaveText("3");
+  expect(
+    await page.evaluate(
+      async () =>
+        (await (await import("./storage.mjs")).loadWorkspace()).revision,
+    ),
+  ).toBe("legacy");
+  await save(page);
+  expect(
+    await page.evaluate(
+      async () =>
+        (await (await import("./storage.mjs")).loadWorkspace()).revision,
+    ),
+  ).toMatch(/^local:save:/);
+});
+
+test("manual editing keeps original references out of the local source", async ({
+  page,
+}) => {
+  const batch = data();
+  batch.nodes[0].source_ref = "synthetic:document:1";
+  await importData(page, batch);
+  await select(page);
+  await page.locator("#editNodeBtn").click();
+  await expect(page.locator("#nodeRef")).toHaveValue("");
+  await page.locator("#nodeContent").fill("手动核对后的内容");
+  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  const graph = await download(page),
+    node = graph.nodes[0];
+  expect(node.source_ref).toBe("");
+  expect(node.provenance).toContainEqual({
+    source_id: "test:journal",
+    ref: "synthetic:document:1",
+  });
+  expect(node.provenance).not.toContainEqual({
+    source_id: "local:edits",
+    ref: "synthetic:document:1",
+  });
+});
+
+test("multi-source JSONL survives real import, local save and full backup restoration", async ({
+  page,
+}) => {
+  await page.locator("#fileInput").setInputFiles({
+    name: "synthetic.jsonl",
+    mimeType: "application/x-ndjson",
+    buffer: Buffer.from(stringifyMgp(syntheticGraph(), "jsonl")),
+  });
+  await expect(page.locator("#applyImport")).toBeEnabled();
+  await page.locator("#applyImport").click();
+  await expect(page.locator("#nodeCount")).toHaveText("402");
+  await expect(page.locator("#edgeCount")).toHaveText("2,028");
+  await expect(page.locator("#sourceCount")).toHaveText("3");
+  const before = await download(page);
+  await save(page);
+  await page.reload();
+  await expect(page.locator("#nodeCount")).toHaveText("402");
+  expect(await download(page)).toEqual(before);
+  const backup = await download(page, "backupBtn");
+  await tools(page);
+  await page.locator("#newWorkspaceBtn").click();
+  await page.locator("#confirmAction").click();
+  await expect(page.locator("#nodeCount")).toHaveText("0");
+  await restoreFile(page, backup);
+  await expect(page.locator("#confirmRestore")).toBeEnabled();
+  await page.locator("#confirmRestore").click();
+  expect(await download(page)).toEqual(before);
+});
+
+test("unreadable saved data is retained until an explicit overwrite", async ({
+  page,
+}) => {
+  await importData(page);
+  const backup = await download(page, "backupBtn");
+  backup.graph.edges[0].to = "missing";
+  await page.evaluate(
+    (backup) =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open("memory-galaxy", 1);
+        request.onsuccess = () => {
+          const db = request.result,
+            tx = db.transaction("workspace", "readwrite");
+          tx.objectStore("workspace").put(
+            { backup, autosave: true },
+            "current",
+          );
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    backup,
+  );
+  await page.reload();
+  await expect(page.locator("body")).toHaveAttribute("data-ready", "true");
+  await expect(page.locator("#notice")).toContainText("原数据仍保留");
+  await importData(page);
+  await tools(page);
+  await page.locator("#saveBtn").click();
+  await expect(page.locator("#confirmTitle")).toHaveText(
+    "覆盖未能读取的本机工作区",
+  );
+  await page.locator("#cancelAction").click();
+  const unchanged = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const request = indexedDB.open("memory-galaxy", 1);
+        request.onsuccess = () => {
+          const db = request.result,
+            read = db
+              .transaction("workspace")
+              .objectStore("workspace")
+              .get("current");
+          read.onsuccess = () => {
+            db.close();
+            resolve(read.result);
+          };
+        };
+      }),
+  );
+  expect(unchanged.backup.graph.edges[0].to).toBe("missing");
+  await page.locator("#saveBtn").click();
+  await page.locator("#confirmAction").click();
+  await expect(page.locator("#notice")).toContainText("已保存到这个浏览器");
 });

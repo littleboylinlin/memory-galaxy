@@ -760,3 +760,27 @@ test("bulk node deletion counts a shared edge once and keeps the latest tombston
   assert.equal(plan.graph.deleted.edges[0].deleted_at, t2);
   assert.equal(plan.graph.nodes.length, 0);
 });
+
+test("cross-source updates keep old references only with their original source", () => {
+  const original = batch([
+    node("test:one", { source_ref: "old:document", revision: 50 }),
+  ]);
+  const changed = batch([node("test:one", { label: "changed" })], [], {
+    source: { id: "other:source" },
+  });
+  const graph = planImport(original, changed, { policy: "incoming" }).graph;
+  const record = graph.nodes[0];
+  assert.equal(record.source_id, "other:source");
+  assert.equal(record.source_ref || "", "");
+  assert.equal(record.revision, undefined);
+  assert.ok(
+    record.provenance.some(
+      (p) => p.source_id === original.source.id && p.ref === "old:document",
+    ),
+  );
+  assert.ok(
+    !record.provenance.some(
+      (p) => p.source_id === "other:source" && p.ref === "old:document",
+    ),
+  );
+});

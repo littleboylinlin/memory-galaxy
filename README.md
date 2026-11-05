@@ -84,3 +84,5 @@ CI 在 Node.js 22、24 和四个浏览器项目通过后生成复核产物。mai
 图谱交互与架构参考：[not-mental-model](https://github.com/R4ph3rd/not-mental-model)。
 
 本项目采用 [MIT 许可证](LICENSE)。
+
+当前稳定性验收范围与限制见 [验收记录](docs/ACCEPTANCE.md)。

@@ -13,6 +13,8 @@ import {
   loadWorkspace,
   saveWorkspace,
   clearWorkspaceStorage,
+  loadWorkspaceRevision,
+  StorageConflictError,
 } from "./storage.mjs";
 import { BackupUi } from "./backup-ui.mjs";
 import { Sky, PALETTE } from "./sky.mjs";
@@ -68,6 +70,8 @@ let graphReference = null,
   editingEdge = null,
   confirmation = null,
   externalSave = false,
+  unreadableStorage = false,
+  storageRevision = null,
   hasSaved = false;
 const media = matchMedia("(max-width:760px)"),
   motion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -79,11 +83,13 @@ const notice = (message, error = false) => {
 function saveLabel() {
   $("saveStatus").textContent = saving
     ? "正在保存"
-    : dirty
-      ? "未保存到本机"
-      : hasSaved
-        ? "已保存到本机"
-        : "示例 · 未保存";
+    : externalSave
+      ? "本机存储有变化"
+      : dirty
+        ? "未保存到本机"
+        : hasSaved
+          ? "已保存到本机"
+          : "示例 · 未保存";
 }
 function markDirty() {
   dirty = true;
@@ -582,7 +588,7 @@ function openNode(node = null) {
   $("nodeState").value = node?.state || "unknown";
   $("nodeContent").value = node?.content || "";
   $("nodeTags").value = (node?.tags || []).join(", ");
-  $("nodeRef").value = node?.source_ref || "";
+  $("nodeRef").value = node ? workspace.editableReference(node) : "";
   $("nodeSensitive").checked = Boolean(node?.sensitive);
   $("nodeError").hidden = true;
   $("nodeDialog").showModal();
@@ -705,13 +711,17 @@ function download(value, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 let channel = null;
+function pauseAutosave() {
+  externalSave = true;
+  autosave = false;
+  $("autosave").checked = false;
+  clearTimeout(saveTimer);
+  saveLabel();
+}
 try {
   channel = new BroadcastChannel("memory-galaxy-workspace");
   channel.onmessage = () => {
-    externalSave = true;
-    autosave = false;
-    $("autosave").checked = false;
-    clearTimeout(saveTimer);
+    pauseAutosave();
     notice(
       "另一个页面更新了本机存储。已暂停本页自动保存；请先备份当前数据，再决定是否覆盖。",
       true,
@@ -723,11 +733,18 @@ async function persist(manual = true) {
   if (externalSave) {
     if (manual)
       ask(
-        "覆盖另一页面的保存",
-        "另一页面更新过本机存储。确认将使用当前页面的完整工作区覆盖，请先下载需要保留的备份。",
-        () => {
-          externalSave = false;
-          persist(true);
+        unreadableStorage ? "覆盖未能读取的本机工作区" : "覆盖另一页面的保存",
+        unreadableStorage
+          ? "此前未能读取本机工作区。继续将覆盖原保存，请先保留需要的数据和备份。"
+          : "另一页面更新过本机存储。确认将使用当前页面的完整工作区覆盖，请先下载需要保留的备份。",
+        async () => {
+          try {
+            storageRevision = await loadWorkspaceRevision();
+            externalSave = false;
+            await persist(true);
+          } catch (error) {
+            notice("无法读取保存版本：" + error.message, true);
+          }
         },
       );
     return;
@@ -747,16 +764,21 @@ async function persist(manual = true) {
   saveLabel();
   saveQueue = saveQueue
     .catch(() => {})
-    .then(() => saveWorkspace(backup, enabled));
+    .then(async () => {
+      if (externalSave) throw new StorageConflictError();
+      storageRevision = await saveWorkspace(backup, enabled, storageRevision);
+    });
   try {
     await saveQueue;
     if (version === workspace.version && viewStamp === viewVersion)
       dirty = false;
     hasSaved = true;
+    unreadableStorage = false;
     channel?.postMessage({ saved: true });
     if (manual)
       notice("图谱、快照和视图已保存到这个浏览器。IndexedDB 存储未加密。");
   } catch (error) {
+    if (error instanceof StorageConflictError) pauseAutosave();
     notice("保存失败，页面中的数据仍保留：" + error.message, true);
   } finally {
     saving--;
@@ -1088,15 +1110,24 @@ $("autosave").onchange = (event) => {
   clearTimeout(saveTimer);
   persist(true);
 };
-$("clearSaveBtn").onclick = () =>
+$("clearSaveBtn").onclick = () => {
+  const allowExternal = externalSave;
   ask(
     "清除本机缓存",
-    "删除这个浏览器保存的图谱、快照和视图，并关闭自动保存。当前页面的数据仍保留，请按需先下载完整备份。",
+    (externalSave ? "其他页面已更新保存，继续会清除其保存内容。" : "") +
+      "删除这个浏览器保存的图谱、快照和视图，并关闭自动保存。当前页面的数据仍保留，请按需先下载完整备份。",
     async () => {
       autosave = false;
       $("autosave").checked = false;
       clearTimeout(saveTimer);
-      saveQueue = saveQueue.catch(() => {}).then(() => clearWorkspaceStorage());
+      saveQueue = saveQueue
+        .catch(() => {})
+        .then(async () => {
+          if (allowExternal) storageRevision = await loadWorkspaceRevision();
+          storageRevision = await clearWorkspaceStorage(storageRevision);
+          externalSave = false;
+          unreadableStorage = false;
+        });
       try {
         await saveQueue;
         dirty = true;
@@ -1105,10 +1136,12 @@ $("clearSaveBtn").onclick = () =>
         channel?.postMessage({ cleared: true });
         notice("本机缓存已清除，自动保存已关闭。当前页面里的数据仍保留。");
       } catch (error) {
+        if (error instanceof StorageConflictError) pauseAutosave();
         notice("清除缓存失败：" + error.message, true);
       }
     },
   );
+};
 window.addEventListener("beforeunload", (event) => {
   if (dirty && !workspace.demo) {
     event.preventDefault();
@@ -1120,6 +1153,7 @@ async function initialize() {
   $("mainArea").inert = true;
   try {
     const saved = await loadWorkspace();
+    storageRevision = saved?.revision ?? null;
     if (saved?.backup) {
       workspace.restoreBackup(saved.backup, {
         record: false,
@@ -1139,6 +1173,8 @@ async function initialize() {
       );
     }
   } catch (error) {
+    unreadableStorage = true;
+    pauseAutosave();
     notice("无法读取本机工作区，原数据仍保留：" + error.message, true);
   }
   if (motion.matches) workspace.view.animate = false;
