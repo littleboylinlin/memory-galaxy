@@ -725,6 +725,7 @@ $("nodeForm").onsubmit = (event) => {
       id = workspace.addNode(fields);
     }
     $("nodeDialog").close();
+    saveLabel();
     locate(id, true);
   } catch (error) {
     $("nodeError").textContent = error.message;
@@ -773,6 +774,7 @@ $("edgeForm").onsubmit = (event) => {
     if (editingEdge) workspace.editEdge(editingEdge, fields);
     else workspace.addEdge(fields);
     $("edgeDialog").close();
+    saveLabel();
     renderInspector();
   } catch (error) {
     $("edgeError").textContent = error.message;
@@ -1129,6 +1131,7 @@ $("snapshotForm").onsubmit = (event) => {
   try {
     workspace.snapshot($("snapshotLabel").value.trim() || "命名快照");
     $("snapshotDialog").close();
+    saveLabel();
   } catch (error) {
     notice(error.message, true);
   }

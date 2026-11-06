@@ -198,6 +198,14 @@ textarea::placeholder {
   padding: 10px 6px;
   line-height: 1.6;
   overflow-wrap: anywhere;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+}
+.endpoint-results button:hover,
+.endpoint-results button:focus-visible {
+  background: #22334d;
 }
 .endpoint-picker p {
   overflow-wrap: anywhere;
