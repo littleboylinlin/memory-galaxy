@@ -45,6 +45,7 @@ npm run dev
 - [源码与数据路径审计](docs/AUDIT.md)
 - [开发与贡献](CONTRIBUTING.md)
 - [CI、构建校验与 Pages 部署](docs/DEPLOYMENT.md)
+- [0.3.5 修复与验证范围](docs/VERIFICATION-0.3.5.md)
 - [0.3.4 修复与验证范围](docs/VERIFICATION-0.3.4.md)
 
 关系来自导入数据或用户明确创建，页面不会自行补充。`full` 是导出方的声明，无法证明已读取某个平台的全部记忆。所有正文、指令和 URL 都作为不可信文本处理，不会执行。

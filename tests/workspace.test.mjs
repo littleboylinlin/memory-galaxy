@@ -61,6 +61,33 @@ test("editing preserves stable identity, provenance and prior snapshots without 
   assert.throws(() => w.editNode("a", { id: "changed" }), /稳定 ID/);
   assert.equal(w.graph.nodes[0].id, "a");
 });
+test("rename snapshots identify the old content while activity identifies the applied edit", () => {
+  const w = workspace();
+  w.editNode("a", { label: "新标题" });
+  assert.equal(w.snapshots.at(-1).label, "编辑前：a");
+  assert.equal(w.snapshots.at(-1).graph.nodes[0].label, "a");
+  assert.equal(w.events.at(-1).label, "编辑记忆：新标题");
+  w.editNode("a", { label: "第三版" });
+  assert.equal(w.snapshots.at(-1).label, "编辑前：新标题");
+  w.restoreSnapshot(w.snapshots[0].id);
+  assert.equal(w.graph.nodes[0].label, "a");
+  const backup = w.backup();
+  assert.deepEqual(parseBackup(JSON.stringify(backup)), backup);
+});
+test("automatic snapshots describe the preceding operation and respect title bounds", () => {
+  const w = workspace();
+  w.editEdge(edgeKey(w.graph.edges[0]), { type: "supports", evidence: "核对" });
+  assert.equal(w.snapshots.at(-1).label, "编辑关系前：uses");
+  assert.equal(w.snapshots.at(-1).graph.edges[0].type, "uses");
+  w.editNode("a", { label: "长".repeat(200) });
+  w.editNode("a", { label: "短标题" });
+  assert.equal(
+    w.snapshots.at(-1).label,
+    ("编辑前：" + "长".repeat(200)).slice(0, 120),
+  );
+  w.deleteNode("b");
+  assert.equal(w.snapshots.at(-1).label, "操作前：删除记忆：b");
+});
 test("invalid edits are atomic and cannot add dangling relationships", () => {
   const w = workspace(),
     before = w.backup();

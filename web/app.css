@@ -105,6 +105,8 @@ textarea::placeholder {
   display: grid;
   grid-template-rows: 80px minmax(0, 1fr) 28px;
   overflow: hidden;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .app-header {
   display: flex;
@@ -1099,6 +1101,13 @@ select {
 .dialog-footer .btn {
   min-height: 40px;
 }
+.inspector-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #141a2e;
+  padding: 8px 0;
+}
 .restore-summary {
   list-style: none;
   margin: 0 0 14px;
@@ -1160,10 +1169,10 @@ dialog {
     padding: 28px 24px;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1100px) and (max-height: 600px) {
   .app {
     grid-template-rows: 68px minmax(0, 1fr) 26px;
-    min-height: 460px;
+    min-height: 0;
   }
   .app-header {
     padding: 0 15px;
@@ -1365,6 +1374,83 @@ dialog {
   }
   .view-options {
     min-height: 30px;
+  }
+}
+@media (max-width: 1100px) and (max-height: 600px) and (orientation: landscape) {
+  .app {
+    grid-template-rows: 48px minmax(0, 1fr) 20px;
+  }
+  .app-header {
+    padding: 0 14px;
+  }
+  .brand-sub {
+    display: none;
+  }
+  .save-controls {
+    flex-direction: row;
+    align-items: center;
+    gap: 9px;
+  }
+  .save-status {
+    font-size: 10px;
+  }
+  .main-area {
+    grid-template-rows: 38px minmax(0, 1fr);
+  }
+  .view-nav [role="tab"] {
+    min-height: 36px;
+  }
+  .stage-heading {
+    top: 10px;
+    left: 14px;
+  }
+  .stage-heading .eyebrow {
+    display: none;
+  }
+  .stage-heading p {
+    margin: 0;
+  }
+  .graph-controls {
+    left: 12px;
+    bottom: 10px;
+  }
+  .stage-footer {
+    left: auto;
+    right: 12px;
+    bottom: 10px;
+    max-width: calc(100% - 270px);
+    text-align: right;
+  }
+  .stage-footer p {
+    display: none;
+  }
+  .inspector {
+    left: auto;
+    right: 8px;
+    top: 8px;
+    bottom: 8px;
+    width: min(360px, 48%);
+    max-height: none;
+    padding: 12px 14px;
+  }
+  .inspector h2 {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  .inspector-actions .btn {
+    padding: 6px 8px;
+  }
+  .dialog-heading {
+    padding: 10px 16px;
+  }
+  .dialog-heading h2 {
+    font-size: 16px;
+  }
+  .dialog-body {
+    padding: 12px 16px;
+  }
+  .dialog-footer {
+    padding: 8px 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -98,7 +98,9 @@ function editorDirty(id) {
 function hasDraft() {
   return [...editorBaselines.keys()].some(editorDirty);
 }
-const media = matchMedia("(max-width:760px)"),
+const media = matchMedia(
+    "(max-width: 760px), (max-width: 1100px) and (max-height: 600px)",
+  ),
   motion = matchMedia("(prefers-reduced-motion: reduce)");
 workspace.view.animate = !motion.matches;
 const notice = (message, error = false) => {

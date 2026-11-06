@@ -7,7 +7,9 @@ import {
   LIMITS,
   emptyGraph,
   edgeKey,
+  MgpError,
 } from "./mgp.mjs";
+import { jsonSyntaxIssue } from "./json-errors.mjs";
 export const BACKUP_FORMAT = "memory-galaxy/backup/1";
 export const HISTORY_LIMIT = 12;
 export const HISTORY_BYTES = 16 * 1024 * 1024;
@@ -194,7 +196,12 @@ export function validateBackup(value) {
 export function parseBackup(text) {
   if (new TextEncoder().encode(text).length > BACKUP_BYTES)
     throw new Error("备份超过 48 MiB");
-  const value = JSON.parse(text);
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    throw new MgpError([jsonSyntaxIssue(error, text)]);
+  }
   validateBackup(value);
   return value;
 }
@@ -252,9 +259,13 @@ export class Workspace extends EventTarget {
       this.pruned++;
     }
   }
-  replace(graph, label = "导入记忆", { demo = false, capture = true } = {}) {
+  replace(
+    graph,
+    label = "导入记忆",
+    { demo = false, capture = true, snapshotLabel = "操作前：" + label } = {},
+  ) {
     assertGraph(graph);
-    if (capture) this.capture(label);
+    if (capture) this.capture(snapshotLabel);
     this.graph = clone(graph);
     this.demo = demo && isExampleGraph(graph);
     const ids = new Set(graph.nodes.map((node) => node.id));
@@ -281,8 +292,10 @@ export class Workspace extends EventTarget {
       ...(deleted ? { deleted } : {}),
     };
   }
-  apply(delta, label) {
-    this.replace(mergeMgp(this.graph, delta, { policy: "incoming" }), label);
+  apply(delta, label, snapshotLabel) {
+    this.replace(mergeMgp(this.graph, delta, { policy: "incoming" }), label, {
+      snapshotLabel,
+    });
   }
   addNode(fields) {
     const base = this.demo ? emptyGraph() : this.graph;
@@ -321,7 +334,11 @@ export class Workspace extends EventTarget {
       revision:
         current.source_id === source.id ? (current.revision || 0) + 1 : 1,
     };
-    this.apply(this.delta([next]), "编辑记忆：" + next.label);
+    this.apply(
+      this.delta([next]),
+      "编辑记忆：" + next.label,
+      "编辑前：" + current.label,
+    );
   }
   deleteNode(id) {
     if (this.demo) throw new Error("示例不能删除，请先新建工作区");
@@ -398,7 +415,11 @@ export class Workspace extends EventTarget {
             },
           ],
         };
-    this.apply(this.delta([], [next], deleted), "编辑关系");
+    this.apply(
+      this.delta([], [next], deleted),
+      "编辑关系",
+      "编辑关系前：" + current.type,
+    );
   }
   deleteEdge(key) {
     if (this.demo) throw new Error("示例不能删除，请先新建工作区");

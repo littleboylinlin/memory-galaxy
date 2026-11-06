@@ -50,6 +50,8 @@ export class BackupUi {
     this.summary.replaceChildren();
     this.status.classList.remove("error");
     this.status.textContent = "正在读取并校验完整备份…";
+    document.getElementById("restoreErrorDetails").hidden = true;
+    document.getElementById("restoreErrorDetails").open = false;
     this.dialog.showModal();
     try {
       if (file.size > BACKUP_BYTES) throw new Error("完整备份超过 48 MiB");
@@ -69,7 +71,11 @@ export class BackupUi {
           clearTimeout(this.timeout);
           worker.terminate();
           this.worker = null;
-          data.ok ? resolve(data.backup) : reject(new Error(data.error));
+          data.ok
+            ? resolve(data.backup)
+            : reject(
+                Object.assign(new Error(data.error), { issues: data.issues }),
+              );
         };
         worker.onerror = () => {
           clearTimeout(this.timeout);
@@ -99,6 +105,14 @@ export class BackupUi {
       if (token !== this.token) return;
       this.status.textContent = "备份未载入：" + error.message;
       this.status.classList.add("error");
+      const detail = error.issues
+        ?.map((issue) => issue.detail)
+        .filter(Boolean)
+        .join("\n");
+      if (detail) {
+        document.getElementById("restoreErrorText").textContent = detail;
+        document.getElementById("restoreErrorDetails").hidden = false;
+      }
     }
   }
 }
