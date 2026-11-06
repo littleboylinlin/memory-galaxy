@@ -258,7 +258,11 @@ test("sensitive hints cover raw extensions, source declarations, title and numer
     !JSON.stringify(r.checks.full.sensitive).includes("test@example.invalid"),
   );
   assert(sensitiveHints({ content: "sk-" + "x".repeat(30) }).length);
-  assert.equal(sensitiveHints({ content: "普通测试文本" }).length, 0);
+  assert.equal(
+    sensitiveHints({ content: "普通测试文本", sensitive: false }).length,
+    0,
+  );
+  assert(sensitiveHints({ sensitive: true }).length);
 });
 test("delta checks scan only exported changes, unchanged contexts and current exported source metadata", async () => {
   const g = graph();

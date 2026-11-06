@@ -319,6 +319,7 @@ export class TopicPackUi {
       if (!record) throw new Error("该配置已不存在，请刷新目录。");
       this.config = record.config;
       this.id = record.id;
+      $("packSaved").value = record.id;
       this.revision = record.revision;
       this.baseline = record.baseline;
       this.savedSignature = JSON.stringify(this.config);

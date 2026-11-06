@@ -521,16 +521,21 @@
               <p class="insight-note">
                 筛选条件同时满足才成为起点；关键词为空表示不限。沿原图实际关系双向扩展，扩展项可能不匹配筛选。手动加入项也作为起点，移除项不会参与扩展；不依据相似度推断关系。
               </p>
-              <div class="node-picker pack-picker">
-                <label for="packAddNode"
-                  >按标题手动加入记忆<input
-                    id="packAddNode"
-                    autocomplete="off"
-                    aria-expanded="false"
-                    aria-controls="packAddNodeResults"
-                    aria-describedby="packAddNodeHint"
-                /></label>
-                <ul id="packAddNodeResults" class="picker-results" hidden></ul>
+              <div class="endpoint-picker pack-picker">
+                <label for="packAddNode">按标题手动加入记忆</label>
+                <input
+                  class="field"
+                  id="packAddNode"
+                  autocomplete="off"
+                  aria-expanded="false"
+                  aria-controls="packAddNodeResults"
+                  aria-describedby="packAddNodeHint"
+                />
+                <ul
+                  id="packAddNodeResults"
+                  class="endpoint-results"
+                  hidden
+                ></ul>
                 <p id="packAddNodeHint" class="insight-note">
                   输入标题后，从搜索结果中选择；同名记录按稳定 ID 区分。
                 </p>

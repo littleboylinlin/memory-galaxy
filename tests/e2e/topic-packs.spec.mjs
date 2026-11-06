@@ -199,6 +199,7 @@ test("configuration and hashed baseline persist separately through refresh and d
   await expect(page.locator("body")).toHaveAttribute("data-ready", "true");
   await expect(page.locator("#packTitle")).toHaveValue("虚构测试主题");
   await expect(page.locator("#packTag")).toHaveValue("算法");
+  await expect(page.locator("#packSaved")).toHaveValue(saved.id);
   await preview(page);
   await expect(page.locator("#packDiffSummary")).toContainText(
     "记忆 新增 0 / 修改 0 / 移出 0",
@@ -344,7 +345,7 @@ test("save feedback waits for transaction commit, prevents duplicates and guards
         return e.defaultPrevented;
       }),
     ).toBe(true);
-    expect(await page.evaluate(() => window.packPuts)).toBe(1);
+    await expect.poll(() => page.evaluate(() => window.packPuts)).toBe(1);
   } finally {
     await page.evaluate(() => (window.holdPack = false));
   }

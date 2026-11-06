@@ -182,7 +182,11 @@ export function sensitiveHints(record) {
     } else if (object(value) || Array.isArray(value))
       for (const [key, item] of Object.entries(value)) {
         // Extension keys may also carry a sensitivity marker.
-        if (/密码|密钥|secret|password|sensitive/i.test(key)) {
+        if (
+          key === "sensitive" && typeof item === "boolean"
+            ? item
+            : /密码|密钥|secret|password|sensitive/i.test(key)
+        ) {
           const reason = "敏感信息字段";
           if (!findings.has(reason)) findings.set(reason, []);
           findings.get(reason).push([...path, key].join("."));
