@@ -22,6 +22,8 @@ import { GROUP_NAMES } from "./layout.mjs";
 import { readTabState, writeTabState } from "./tab-state.mjs";
 import { NodePicker } from "./node-picker.mjs";
 import { InsightsUi } from "./insights-ui.mjs";
+import { TopicPackUi } from "./topic-pack-ui.mjs";
+import { matchesMemory } from "./memory-filter.mjs";
 const $ = (id) => document.getElementById(id);
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -143,6 +145,7 @@ function saveSession() {
     selected,
     camera: sky.getCamera(),
     insights: insights.tabState(),
+    packs: packs.tabState(),
   });
 }
 function scheduleSession() {
@@ -194,6 +197,7 @@ function syncGraph({ restoredView = false } = {}) {
   const changed = graphReference !== workspace.graph;
   if (changed) {
     insights.invalidate();
+    packs.invalidate();
     if (graphReference && !restoredView && !workspace.demo) {
       const ids = new Set(workspace.graph.nodes.map((node) => node.id));
       workspace.view.positions = sky
@@ -238,6 +242,20 @@ const insights = new InsightsUi({
   hasPendingWorkspace: () => dirty || saving > 0 || hasDraft(),
   onLocate: locate,
   onConfirm: ask,
+  onSessionChange: scheduleSession,
+});
+const packs = new TopicPackUi({
+  getGraph: () => workspace.graph,
+  getFilters: () => ({
+    keyword: $("search").value,
+    type: typeFilter,
+    state: stateFilter,
+  }),
+  isExample: () => workspace.demo,
+  hasPendingWorkspace: () => dirty || saving > 0 || hasDraft(),
+  recordUi: insights,
+  onConfirm: ask,
+  onDownload: download,
   onSessionChange: scheduleSession,
 });
 workspace.addEventListener("change", workspaceChanged);
@@ -289,15 +307,12 @@ function renderFilters() {
   }
 }
 function applyFilters() {
-  filtered = workspace.graph.nodes.filter(
-    (node) =>
-      (typeFilter === "all" || node.type === typeFilter) &&
-      (stateFilter === "all" || (node.state || "unknown") === stateFilter) &&
-      (!query ||
-        [node.id, node.label, node.content || "", ...(node.tags || [])]
-          .join(" ")
-          .toLocaleLowerCase()
-          .includes(query)),
+  filtered = workspace.graph.nodes.filter((node) =>
+    matchesMemory(node, {
+      keyword: query,
+      type: typeFilter,
+      state: stateFilter,
+    }),
   );
   sky.setFilter(new Set(filtered.map((node) => node.id)));
   const results = $("searchResults");
@@ -388,6 +403,7 @@ function showView(next, focus = false) {
   if (next === "sources") renderSources();
   if (next === "graph") sky.resize();
   insights.activate(next);
+  packs.activate(next);
   $("inspector").hidden = next !== "graph" || !selected;
   if (focus) $("tab-" + next).focus();
   scheduleSession();
@@ -797,10 +813,13 @@ $("edgeForm").onsubmit = (event) => {
     $("edgeError").hidden = false;
   }
 };
-function download(value, name) {
-  const blob = new Blob([JSON.stringify(value)], {
-      type: "application/json",
-    }),
+function download(value, name, type = "application/json") {
+  const blob = new Blob(
+      [type === "application/json" ? JSON.stringify(value) : value],
+      {
+        type,
+      },
+    ),
     url = URL.createObjectURL(blob),
     anchor = element("a");
   anchor.href = url;
@@ -1241,7 +1260,7 @@ $("clearSaveBtn").onclick = () => {
   ask(
     "清除本机缓存",
     (externalSave ? "其他页面已更新保存，继续会清除其保存内容。" : "") +
-      "删除这个浏览器保存的图谱、快照和视图，并关闭自动保存。当前页面数据与独立回顾状态仍保留；回顾状态可在回顾页清除。请按需先下载完整备份。",
+      "删除这个浏览器保存的图谱、快照和视图，并关闭自动保存。当前页面数据、独立回顾状态及主题包配置仍保留；回顾状态可在回顾页清除。请按需先下载完整备份。",
     async () => {
       autosave = false;
       $("autosave").checked = false;
@@ -1261,7 +1280,7 @@ $("clearSaveBtn").onclick = () => {
         saveLabel();
         channel?.postMessage({ cleared: true });
         notice(
-          "本机缓存已清除（仅工作区），自动保存已关闭。当前页面数据与独立回顾状态仍保留；回顾状态可在回顾页清除。",
+          "本机缓存已清除（仅工作区），自动保存已关闭。当前页面数据、独立回顾状态及主题包配置仍保留；回顾状态可在回顾页清除。",
         );
       } catch (error) {
         if (error instanceof StorageConflictError) pauseAutosave();
@@ -1276,6 +1295,8 @@ window.addEventListener("beforeunload", (event) => {
     dirty ||
     saving ||
     insights.pending ||
+    packs.pending ||
+    packs.dirty ||
     hasDraft() ||
     $("input").value.trim() ||
     ($("importDialog").open && $("importText").value.trim())
@@ -1324,6 +1345,7 @@ async function initialize() {
   const transient = readTabState();
   if (transient) {
     insights.restoreTabState(transient.insights);
+    packs.restoreTabState(transient.packs);
     query = transient.query.trim().toLocaleLowerCase();
     typeFilter = transient.typeFilter;
     stateFilter = transient.stateFilter;

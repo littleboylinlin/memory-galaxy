@@ -1,0 +1,131 @@
+.pack-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin: 12px 0;
+}
+.pack-toolbar label,
+.pack-fields label,
+.pack-picker label,
+.pack-kind {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #b9c8e0;
+  min-width: 0;
+}
+.pack-toolbar select {
+  max-width: min(360px, 100%);
+}
+.pack-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 14px;
+  margin: 14px 0;
+}
+.pack-fields input,
+.pack-fields select,
+.pack-toolbar select,
+.pack-picker input,
+.pack-kind select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+}
+.pack-editor {
+  margin: 14px 0;
+  border: 1px solid #354765;
+  border-radius: 12px;
+  padding: 14px;
+}
+.pack-editor summary,
+.pack-raw summary {
+  cursor: pointer;
+  color: #c6b6f4;
+  font-size: 13px;
+}
+.pack-picker {
+  position: relative;
+  margin-top: 16px;
+  max-width: 650px;
+}
+.pack-kind {
+  max-width: 480px;
+  margin-top: 14px;
+}
+.pack-raw {
+  margin: 12px 0;
+}
+.pack-raw pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.65;
+  background: #0b1324;
+  padding: 12px;
+  max-height: 350px;
+  overflow: auto;
+}
+#packResults .health-node {
+  border: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+#packStatus:empty {
+  display: none;
+}
+#packStatus {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+#packResults .btn {
+  margin-top: 8px;
+  min-height: 40px;
+}
+@media (max-width: 760px), (max-width: 1100px) and (max-height: 600px) {
+  .pack-toolbar > * {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+  .pack-toolbar select {
+    max-width: 100%;
+  }
+  .pack-fields {
+    gap: 10px;
+  }
+  .pack-raw pre {
+    max-height: 240px;
+  }
+}
+@media (max-width: 1100px) and (max-height: 600px) and (orientation: landscape) {
+  #panel-packs {
+    padding: 16px 20px 30px;
+  }
+  #panel-packs .page-heading {
+    margin-bottom: 12px;
+  }
+  #panel-packs .page-heading h2 {
+    font-size: 20px;
+    margin: 5px 0;
+  }
+  #panel-packs .page-heading .eyebrow,
+  #panel-packs .page-heading p {
+    display: none;
+  }
+  .pack-toolbar {
+    gap: 8px;
+    margin: 8px 0;
+  }
+  .pack-toolbar > * {
+    flex: 0 1 auto;
+  }
+  .pack-editor {
+    margin: 8px 0;
+    padding: 10px;
+  }
+  .pack-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

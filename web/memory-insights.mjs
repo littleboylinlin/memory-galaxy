@@ -1,6 +1,6 @@
 import { graphSources, edgeKey, emptyGraph, isMgpTimestamp } from "./mgp.mjs";
 import { DAY, REVIEW_INTERVAL, validateReviewRecord } from "./review-state.mjs";
-const canonical = (value) =>
+export const canonical = (value) =>
   Array.isArray(value)
     ? value.map(canonical)
     : value && typeof value === "object"
@@ -226,7 +226,6 @@ export function healthCheck(graph, { now = Date.now(), staleDays = 90 } = {}) {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(id);
   };
-  const aggregate = JSON.stringify(canonical(emptyGraph().source));
   for (const node of graph.nodes) {
     add(titles, JSON.stringify([node.type, normalized(node.label)]), node.id);
     add(bodies, normalized(node.content), node.id);
@@ -238,39 +237,9 @@ export function healthCheck(graph, { now = Date.now(), staleDays = 90 } = {}) {
           ? "仅有自关联，尚未关联到其他记忆。"
           : "当前图谱没有此记忆的关联记录。",
       });
-    const references = [
-      { source_id: node.source_id || graph.source.id, ref: node.source_ref },
-      ...(node.provenance || []),
-    ];
-    const declared = references.filter((item) => {
-      const source = index.sources.get(item.source_id);
-      return (
-        source &&
-        !(
-          /^workspace:local(?::[1-9]\d*)?$/.test(source.id) &&
-          JSON.stringify(canonical({ ...source, id: "workspace:local" })) ===
-            aggregate
-        )
-      );
-    });
-    if (!declared.length)
-      result.sources.push({
-        id: node.id,
-        reason: "未找到可追溯的来源声明，或只有工作区占位来源。",
-      });
-    else if (
-      !declared.some(
-        (item) => typeof item.ref === "string" && item.ref.trim(),
-      ) &&
-      !declared.some(
-        (item) => index.sources.get(item.source_id)?.platform === "manual",
-      )
-    )
-      result.sources.push({
-        id: node.id,
-        reason:
-          "有来源声明，但没有可定位原文的 source_ref 或 provenance.ref；来源声明本身未经独立核实。",
-      });
+    const sourceReason = sourceIssue(node, graph, index);
+    if (sourceReason)
+      result.sources.push({ id: node.id, reason: sourceReason });
     const updated = timestamp(node.updated_at);
     if (updated === null) result.missingTime++;
     else if (updated > now) result.futureTime++;
@@ -299,4 +268,33 @@ export function healthCheck(graph, { now = Date.now(), staleDays = 90 } = {}) {
         });
       }
   return result;
+}
+
+export function sourceIssue(node, graph, index = memoryIndex(graph)) {
+  const aggregate = JSON.stringify(canonical(emptyGraph().source));
+  const references = [
+    { source_id: node.source_id || graph.source.id, ref: node.source_ref },
+    ...(node.provenance || []),
+  ];
+  const declared = references.filter((item) => {
+    const source = index.sources.get(item.source_id);
+    return (
+      source &&
+      !(
+        /^workspace:local(?::[1-9]\d*)?$/.test(source.id) &&
+        JSON.stringify(canonical({ ...source, id: "workspace:local" })) ===
+          aggregate
+      )
+    );
+  });
+  if (!declared.length) return "未找到可追溯的来源声明，或只有工作区占位来源。";
+  else if (
+    !declared.some((item) => typeof item.ref === "string" && item.ref.trim()) &&
+    !declared.some(
+      (item) => index.sources.get(item.source_id)?.platform === "manual",
+    )
+  )
+    return "有来源声明，但没有可定位原文的 source_ref 或 provenance.ref；来源声明本身未经独立核实。";
+
+  return null;
 }

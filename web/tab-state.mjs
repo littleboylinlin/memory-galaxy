@@ -6,6 +6,7 @@ const views = [
   "list",
   "review",
   "health",
+  "packs",
   "timeline",
   "history",
   "sources",
@@ -18,6 +19,12 @@ export function tabState(value) {
   const camera = value.camera;
   return {
     version: 1,
+    ...(typeof value.packs?.id === "string" &&
+    value.packs.id.length > 0 &&
+    value.packs.id.length <= 256 &&
+    !/[\u0000-\u001f]/.test(value.packs.id)
+      ? { packs: { id: value.packs.id } }
+      : {}),
     ...(value.insights ? { insights: insightTabState(value.insights) } : {}),
     view: views.includes(value.view) ? value.view : "graph",
     query: typeof value.query === "string" ? value.query.slice(0, 500) : "",
