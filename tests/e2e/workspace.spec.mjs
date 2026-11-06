@@ -110,7 +110,7 @@ test("manual creation starts a real workspace without sample records", async ({
   await page.locator("#nodeLabel").fill("第一颗星");
   await page.locator("#nodeContent").fill("自己记录的事实");
   await page.locator("#nodeState").selectOption("confirmed");
-  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await expect(page.locator("#nodeCount")).toHaveText("1");
   await expect(page.locator("#detailTitle")).toHaveText("第一颗星");
   const graph = await download(page);
@@ -128,7 +128,7 @@ test("edits keep IDs, original provenance and visible state changes", async ({
   await page.locator("#nodeLabel").fill("核对后的阅读记录");
   await page.locator("#nodeState").selectOption("disputed");
   await page.locator("#nodeTags").fill("书籍, 文档");
-  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await expect(page.locator("#detailState")).toHaveText("有争议");
   const graph = await download(page),
     node = graph.nodes.find((n) => n.id === "note:a");
@@ -147,12 +147,13 @@ test("relationships require real endpoints and evidence and preserve identity wh
   await page.locator("#edgeTo").fill("missing");
   await page.locator("#edgeType").fill("uses");
   await page.locator("#edgeEvidence").fill("核对文档");
-  await page.getByRole("button", { name: "保存关系", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await expect(page.locator("#edgeError")).toContainText("现有节点");
   await expect(page.locator("#edgeCount")).toHaveText("1");
-  await page.locator("#edgeTo").fill("note:c");
+  await page.locator("#edgeTo").fill("离线工具");
+  await page.locator('#edgeToResults button[data-node-id="note:c"]').click();
   await page.locator("#edgeBasis").selectOption("inferred");
-  await page.getByRole("button", { name: "保存关系", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await expect(page.locator("#edgeCount")).toHaveText("2");
   const first = await download(page),
     id = first.edges.find((e) => e.to === "note:c").id;
@@ -160,7 +161,7 @@ test("relationships require real endpoints and evidence and preserve identity wh
   const card = page.locator(".relation-card").filter({ hasText: "离线工具" });
   await card.getByRole("button", { name: "编辑", exact: true }).click();
   await page.locator("#edgeType").fill("relates_to");
-  await page.getByRole("button", { name: "保存关系", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   const after = await download(page);
   expect(after.edges.find((e) => e.id === id).type).toBe("relates_to");
 });
@@ -212,7 +213,7 @@ test("named snapshots restore only after confirmation and keep the replaced vers
   await select(page);
   await page.locator("#editNodeBtn").click();
   await page.locator("#nodeContent").fill("第二版正文");
-  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await page.locator("#tab-history").click();
   await page
     .locator(".snapshot-card")
@@ -243,7 +244,7 @@ test("full backups preview, cancel, restore and retain pinned positions and hist
   await closeTools(page);
   await page.locator("#editNodeBtn").click();
   await page.locator("#nodeContent").fill("恢复前版本");
-  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await restoreFile(page, backup);
   await expect(page.locator("#confirmRestore")).toBeEnabled();
   await page.locator("#cancelRestore").click();
@@ -299,7 +300,7 @@ test("saving persists graph, snapshots and settings across reloads", async ({
   await select(page);
   await page.locator("#editNodeBtn").click();
   await page.locator("#nodeContent").fill("保存的第二版");
-  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await save(page);
   await page.reload();
   await expect(page.locator("#nodeCount")).toHaveText("3");
@@ -338,7 +339,7 @@ test("autosave is opt-in and clearing cache keeps current memory while disabling
   await select(page);
   await page.locator("#editNodeBtn").click();
   await page.locator("#nodeContent").fill("自动保存正文");
-  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   await expect(page.locator("#saveStatus")).toHaveText("已保存到本机");
   await page.reload();
   await expect(page.locator("#nodeCount")).toHaveText("3");
@@ -574,6 +575,7 @@ test("another open page pauses autosave and asks before overwriting shared stora
   await other.goto("web/");
   await expect(other.locator("body")).toHaveAttribute("data-ready", "true");
   await tools(other);
+  await other.locator("#showLabels").uncheck();
   await other.locator("#saveBtn").click();
   await expect(other.locator("#notice")).toContainText("已保存到这个浏览器");
   await tools(page);
@@ -843,7 +845,7 @@ test("manual editing keeps original references out of the local source", async (
   await page.locator("#editNodeBtn").click();
   await expect(page.locator("#nodeRef")).toHaveValue("");
   await page.locator("#nodeContent").fill("手动核对后的内容");
-  await page.getByRole("button", { name: "保存记忆", exact: true }).click();
+  await page.getByRole("button", { name: "应用更改", exact: true }).click();
   const graph = await download(page),
     node = graph.nodes[0];
   expect(node.source_ref).toBe("");
