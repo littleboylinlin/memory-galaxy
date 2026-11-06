@@ -484,18 +484,9 @@
             <p class="preview-demo" id="previewDemo">
               当前浏览的是示例。确认后将从空白工作区导入，示例不会混入你的记忆。
             </p>
-            <h3>拟应用的变化</h3>
-            <div class="preview-stats" id="previewSummary"></div>
-            <p id="previewTotals" class="small muted"></p>
-            <h3>本批来源与覆盖声明</h3>
-            <ul class="preview-sources" id="previewSources"></ul>
-            <ul class="preview-warnings" id="previewWarnings" hidden></ul>
-            <details class="record-disclosure">
-              <summary id="recordCount">查看本批记录</summary>
-              <ul class="preview-records" id="previewRecords"></ul>
-            </details>
             <section id="conflictSection" hidden>
               <h3>冲突处理</h3>
+              <div id="previewConflicts"></div>
               <label for="conflictPolicy" class="conflict-policy"
                 >批量处理策略<select id="conflictPolicy">
                   <option value="review">逐项确认</option>
@@ -511,7 +502,6 @@
                 优先，其次比较带时区的更新时间；不同来源不会比较
                 revision。时间缺失或相同不会猜测。
               </p>
-              <div id="previewConflicts"></div>
               <div class="conflict-pagination">
                 <button type="button" class="btn ghost" id="conflictPrevious">
                   上一页</button
@@ -521,6 +511,16 @@
                 </button>
               </div>
             </section>
+            <h3>拟应用的变化</h3>
+            <div class="preview-stats" id="previewSummary"></div>
+            <p id="previewTotals" class="small muted"></p>
+            <h3>本批来源与覆盖声明</h3>
+            <ul class="preview-sources" id="previewSources"></ul>
+            <ul class="preview-warnings" id="previewWarnings" hidden></ul>
+            <details class="record-disclosure">
+              <summary id="recordCount">查看本批记录</summary>
+              <ul class="preview-records" id="previewRecords"></ul>
+            </details>
           </div>
         </section>
       </div>

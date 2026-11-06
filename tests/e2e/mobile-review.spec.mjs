@@ -131,11 +131,20 @@ for (const size of [
       await inViewport(page, "#conflictCount");
       await inViewport(page, "#cancelImport");
       await inViewport(page, "#applyImport");
+      const firstDifference = await page
+        .locator(".field-diff tbody tr")
+        .first()
+        .boundingBox();
+      const footer = await page.locator(".import-footer").boundingBox();
+      expect(firstDifference.y).toBeGreaterThanOrEqual(0);
+      expect(firstDifference.y + firstDifference.height).toBeLessThanOrEqual(
+        footer.y,
+      );
+      await screenshot(page, testInfo, orientation + "-conflict");
       await page.locator("#previewConflicts select").selectOption("incoming");
       await expect(page.locator("#conflictCount")).toContainText(
         "待处理 0 项 · 已处理 1 项",
       );
-      await screenshot(page, testInfo, orientation + "-conflict");
       await page.locator("#applyImport").click();
       await closeTools(page);
       await select(page);

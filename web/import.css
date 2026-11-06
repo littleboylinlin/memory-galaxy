@@ -445,6 +445,26 @@ select {
     height: 100px;
     max-height: 35dvh;
   }
+  .preview-format {
+    margin-bottom: 4px;
+  }
+  #conflictSection > h3 {
+    margin: 0 0 6px;
+  }
+  .conflict-card {
+    padding: 8px;
+    margin-top: 6px;
+  }
+  .conflict-card h4 {
+    margin-bottom: 6px;
+  }
+  .conflict-resolution {
+    margin: 6px 0;
+  }
+  .field-diff th,
+  .field-diff td {
+    padding: 6px 5px;
+  }
   .import-footer {
     padding: 8px 16px;
     display: grid;
