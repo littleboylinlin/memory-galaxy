@@ -19,6 +19,8 @@ import {
 import { BackupUi } from "./backup-ui.mjs";
 import { Sky, PALETTE } from "./sky.mjs";
 import { GROUP_NAMES } from "./layout.mjs";
+import { readTabState, writeTabState } from "./tab-state.mjs";
+import { NodePicker } from "./node-picker.mjs";
 const $ = (id) => document.getElementById(id);
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -72,7 +74,30 @@ let graphReference = null,
   externalSave = false,
   unreadableStorage = false,
   storageRevision = null,
-  hasSaved = false;
+  hasSaved = false,
+  needsMigration = false;
+let sessionReady = false,
+  sessionTimer = null;
+const editorBaselines = new Map();
+function editorValue(id) {
+  return JSON.stringify(
+    [...$(id).querySelectorAll("input,select,textarea")].map((input) => [
+      input.id,
+      input.type === "checkbox" ? input.checked : input.value,
+      input.dataset.nodeId || null,
+    ]),
+  );
+}
+function editorDirty(id) {
+  return (
+    $(id).open &&
+    editorBaselines.has(id) &&
+    editorBaselines.get(id) !== editorValue(id)
+  );
+}
+function hasDraft() {
+  return [...editorBaselines.keys()].some(editorDirty);
+}
 const media = matchMedia("(max-width:760px)"),
   motion = matchMedia("(prefers-reduced-motion: reduce)");
 workspace.view.animate = !motion.matches;
@@ -81,15 +106,45 @@ const notice = (message, error = false) => {
   $("notice").classList.toggle("error", error);
 };
 function saveLabel() {
-  $("saveStatus").textContent = saving
-    ? "正在保存"
-    : externalSave
-      ? "本机存储有变化"
-      : dirty
-        ? "未保存到本机"
-        : hasSaved
-          ? "已保存到本机"
-          : "示例 · 未保存";
+  $("saveStatus").textContent = hasDraft()
+    ? "编辑中 · 尚未应用"
+    : saving
+      ? "正在保存"
+      : externalSave
+        ? "本机存储有变化"
+        : dirty
+          ? "未保存到本机"
+          : hasSaved
+            ? "已保存到本机"
+            : "示例 · 未保存";
+  for (const id of ["saveBtn", "quickSaveBtn"]) {
+    $(id).disabled = saving > 0;
+    $(id).textContent = saving ? "正在保存…" : "保存到本机";
+  }
+  $("saveStatus").dataset.state =
+    hasDraft() || dirty || externalSave ? "pending" : "saved";
+}
+function saveSession() {
+  if (!sessionReady) return;
+  clearTimeout(sessionTimer);
+  writeTabState({
+    version: 1,
+    view,
+    query: $("search").value,
+    typeFilter,
+    stateFilter,
+    listPage,
+    timelinePage,
+    edgePage,
+    timelineMode,
+    selected,
+    camera: sky.getCamera(),
+  });
+}
+function scheduleSession() {
+  if (!sessionReady) return;
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(saveSession, 100);
 }
 function markDirty() {
   dirty = true;
@@ -110,6 +165,7 @@ const sky = new Sky($("sky"), {
     ($("zoomValue").textContent =
       (value < 0.01 ? (value * 100).toFixed(3) : Math.round(value * 100)) +
       "%"),
+  onViewport: scheduleSession,
   onStatus: (status) => {
     if (status.error) {
       layoutUnavailable = true;
@@ -178,8 +234,10 @@ function workspaceChanged(event) {
     event.detail.label +
       (workspace.pruned
         ? `。已移除最早的 ${workspace.pruned} 份快照；长期保留请下载完整备份。`
-        : "。"),
+        : "。") +
+      "已应用到当前工作区，尚未保存到本机。",
   );
+  scheduleSession();
 }
 function renderFilters() {
   const counts = new Map();
@@ -246,6 +304,7 @@ function applyFilters() {
     `当前筛选 ${filtered.length.toLocaleString()} 条 / 共 ${workspace.graph.nodes.length.toLocaleString()} 条。选择标题可定位到星盘并查看详情。`;
   if (view === "list") renderList();
   if (view === "timeline") renderTimeline();
+  scheduleSession();
 }
 function stateBadge(node) {
   const badge = element("span", states[node.state || "unknown"], "state-badge");
@@ -297,6 +356,7 @@ function renderList() {
     wrap.append(card);
   }
   pageControls("list", listPage, filtered.length, PAGE_SIZE);
+  scheduleSession();
 }
 function showView(next, focus = false) {
   view = next;
@@ -314,6 +374,7 @@ function showView(next, focus = false) {
   if (next === "graph") sky.resize();
   $("inspector").hidden = next !== "graph" || !selected;
   if (focus) $("tab-" + next).focus();
+  scheduleSession();
 }
 function locate(id, focus = false) {
   if (!nodeMap.has(id)) return;
@@ -337,6 +398,7 @@ function selectNode(id) {
   edgePage = 0;
   sky.setSelection(id);
   renderInspector();
+  scheduleSession();
 }
 function metaItem(wrap, key, value) {
   if (!value) return;
@@ -429,6 +491,7 @@ function renderInspector() {
     wrap.append(card);
   }
   pageControls("edge", edgePage, links.length, EDGE_PAGE);
+  scheduleSession();
 }
 function renderTimeline() {
   const items =
@@ -489,6 +552,7 @@ function renderTimeline() {
     wrap.append(entry);
   }
   pageControls("timeline", timelinePage, items.length, PAGE_SIZE);
+  scheduleSession();
 }
 function renderHistory() {
   const wrap = $("snapshotList");
@@ -576,8 +640,34 @@ $("cancelAction").onclick = () => {
   confirmation = null;
 };
 $("confirmDialog").addEventListener("cancel", () => (confirmation = null));
+function closeEditor(id) {
+  const close = () => {
+    editorBaselines.delete(id);
+    $(id).close();
+    saveLabel();
+  };
+  if (editorDirty(id))
+    ask(
+      "放弃未应用的编辑",
+      "这些编辑尚未应用。关闭将丢弃表单中的修改，工作区和本机保存仍保留。",
+      close,
+    );
+  else close();
+}
 for (const button of document.querySelectorAll("[data-close]"))
-  button.onclick = () => $(button.dataset.close).close();
+  button.onclick = () => closeEditor(button.dataset.close);
+for (const id of ["nodeDialog", "edgeDialog", "snapshotDialog"]) {
+  $(id).addEventListener("input", saveLabel);
+  $(id).addEventListener("change", saveLabel);
+  $(id).addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeEditor(id);
+  });
+  $(id).addEventListener("close", () => {
+    if (!$(id).open) editorBaselines.delete(id);
+    saveLabel();
+  });
+}
 function openNode(node = null) {
   editingNode = node?.id || null;
   $("nodeDialogTitle").textContent = node ? "编辑记忆" : "添加记忆";
@@ -591,6 +681,7 @@ function openNode(node = null) {
   $("nodeRef").value = node ? workspace.editableReference(node) : "";
   $("nodeSensitive").checked = Boolean(node?.sensitive);
   $("nodeError").hidden = true;
+  editorBaselines.set("nodeDialog", editorValue("nodeDialog"));
   $("nodeDialog").showModal();
   $("nodeLabel").focus();
 }
@@ -634,31 +725,23 @@ $("nodeForm").onsubmit = (event) => {
       id = workspace.addNode(fields);
     }
     $("nodeDialog").close();
+    saveLabel();
     locate(id, true);
   } catch (error) {
     $("nodeError").textContent = error.message;
     $("nodeError").hidden = false;
   }
 };
-function endpointChoices(text = "") {
-  const query = text.toLocaleLowerCase(),
-    choices = workspace.graph.nodes
-      .filter(
-        (node) =>
-          !query ||
-          node.id.toLocaleLowerCase().includes(query) ||
-          node.label.toLocaleLowerCase().includes(query),
-      )
-      .slice(0, 35);
-  $("nodeChoices").replaceChildren(
-    ...choices.map((node) => {
-      const option = element("option");
-      option.value = node.id;
-      option.label = short(node.label, 80);
-      return option;
+const endpointPickers = Object.fromEntries(
+  ["edgeFrom", "edgeTo"].map((id) => [
+    id,
+    new NodePicker(id, {
+      getNodes: () => workspace.graph.nodes,
+      typeName: (type) => GROUP_NAMES[type] || type,
+      onChange: saveLabel,
     }),
-  );
-}
+  ]),
+);
 function openEdge(edge = null) {
   if (workspace.demo) {
     notice("请先导入自己的记忆或新建工作区。", true);
@@ -666,33 +749,32 @@ function openEdge(edge = null) {
   }
   editingEdge = edge ? edgeKey(edge) : null;
   $("edgeDialogTitle").textContent = edge ? "编辑关系" : "添加关系";
-  $("edgeFrom").value = edge?.from || selected || "";
-  $("edgeTo").value = edge?.to || "";
+  endpointPickers.edgeFrom.set(edge?.from || selected);
+  endpointPickers.edgeTo.set(edge?.to);
   $("edgeType").value = edge?.type || "";
   $("edgeBasis").value = edge?.basis || "explicit";
   $("edgeEvidence").value = edge?.evidence || "";
   $("edgeError").hidden = true;
-  endpointChoices();
+  editorBaselines.set("edgeDialog", editorValue("edgeDialog"));
   $("edgeDialog").showModal();
 }
-for (const id of ["edgeFrom", "edgeTo"])
-  $(id).oninput = (event) => endpointChoices(event.target.value);
 $("edgeForm").onsubmit = (event) => {
   event.preventDefault();
   const fields = {
-    from: $("edgeFrom").value.trim(),
-    to: $("edgeTo").value.trim(),
+    from: endpointPickers.edgeFrom.id,
+    to: endpointPickers.edgeTo.id,
     type: $("edgeType").value.trim(),
     basis: $("edgeBasis").value,
     evidence: $("edgeEvidence").value.trim(),
   };
   try {
     if (!nodeMap.has(fields.from) || !nodeMap.has(fields.to))
-      throw new Error("起点和终点必须填写现有节点的稳定 ID");
+      throw new Error("请从搜索结果中选择现有节点作为起点和终点");
     if (!fields.evidence) throw new Error("请填写关系依据");
     if (editingEdge) workspace.editEdge(editingEdge, fields);
     else workspace.addEdge(fields);
     $("edgeDialog").close();
+    saveLabel();
     renderInspector();
   } catch (error) {
     $("edgeError").textContent = error.message;
@@ -730,6 +812,15 @@ try {
 } catch {}
 async function persist(manual = true) {
   clearTimeout(saveTimer);
+  if (saving) {
+    await saveQueue.catch(() => {});
+    if (dirty && !externalSave) return persist(manual);
+    return;
+  }
+  if (manual && hasDraft()) {
+    notice("编辑中的修改尚未应用，请先应用更改，再保存到本机。", true);
+    return;
+  }
   if (externalSave) {
     if (manual)
       ask(
@@ -749,11 +840,17 @@ async function persist(manual = true) {
       );
     return;
   }
+  if (!dirty && hasSaved && !needsMigration) {
+    if (manual) notice("当前工作区已保存到这个浏览器，无需重复保存。");
+    return;
+  }
   let backup;
   try {
     workspace.view = currentView();
     backup = workspace.backup();
   } catch (error) {
+    dirty = true;
+    saveLabel();
     notice("无法准备保存：" + error.message, true);
     return;
   }
@@ -773,11 +870,17 @@ async function persist(manual = true) {
     if (version === workspace.version && viewStamp === viewVersion)
       dirty = false;
     hasSaved = true;
+    needsMigration = false;
     unreadableStorage = false;
     channel?.postMessage({ saved: true });
-    if (manual)
-      notice("图谱、快照和视图已保存到这个浏览器。IndexedDB 存储未加密。");
+    if (manual || !dirty)
+      notice(
+        dirty || hasDraft()
+          ? "此前应用的内容已写入本机；仍有修改尚未保存，请继续应用并保存。"
+          : "图谱、快照和视图已保存到这个浏览器。IndexedDB 存储未加密。",
+      );
   } catch (error) {
+    dirty = true;
     if (error instanceof StorageConflictError) pauseAutosave();
     notice("保存失败，页面中的数据仍保留：" + error.message, true);
   } finally {
@@ -884,6 +987,7 @@ $("search").oninput = (event) => {
   listPage = timelinePage = 0;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(applyFilters, 100);
+  scheduleSession();
 };
 $("search").onkeydown = (event) => {
   if (event.key === "Enter") {
@@ -1019,6 +1123,7 @@ $("memoryTimelineBtn").onclick = () => timelineModeChanged("memory");
 $("activityTimelineBtn").onclick = () => timelineModeChanged("activity");
 $("snapshotBtn").onclick = () => {
   $("snapshotLabel").value = "";
+  editorBaselines.set("snapshotDialog", editorValue("snapshotDialog"));
   $("snapshotDialog").showModal();
 };
 $("snapshotForm").onsubmit = (event) => {
@@ -1026,6 +1131,7 @@ $("snapshotForm").onsubmit = (event) => {
   try {
     workspace.snapshot($("snapshotLabel").value.trim() || "命名快照");
     $("snapshotDialog").close();
+    saveLabel();
   } catch (error) {
     notice(error.message, true);
   }
@@ -1040,7 +1146,8 @@ $("undoBtn").onclick = () => {
 $("newWorkspaceBtn").onclick = () =>
   ask(
     "新建空白工作区",
-    "当前图谱会保留为修改前快照。本机缓存不会立即清除。",
+    (dirty ? "当前有未保存到本机的修改。" : "") +
+      "当前图谱会保留为修改前快照。本机缓存不会立即清除；切换后仍需保存。",
     () => {
       workspace.view.positions = [];
       workspace.replace(emptyGraph(), "新建空白工作区");
@@ -1057,7 +1164,8 @@ $("resetBtn").onclick = () => {
   else
     ask(
       "查看示例星图",
-      "当前图谱会保留为修改前快照。示例不会混入之后导入的数据。",
+      (dirty ? "当前有未保存到本机的修改。" : "") +
+        "当前图谱会保留为修改前快照。示例不会混入之后导入的数据；切换后仍需保存。",
       apply,
     );
 };
@@ -1105,8 +1213,10 @@ $("backupBtn").onclick = () => {
   }
 };
 $("saveBtn").onclick = () => persist(true);
+$("quickSaveBtn").onclick = () => persist(true);
 $("autosave").onchange = (event) => {
   autosave = event.target.checked;
+  markDirty();
   clearTimeout(saveTimer);
   persist(true);
 };
@@ -1143,10 +1253,21 @@ $("clearSaveBtn").onclick = () => {
   );
 };
 window.addEventListener("beforeunload", (event) => {
-  if (dirty && !workspace.demo) {
+  saveSession();
+  if (
+    dirty ||
+    saving ||
+    hasDraft() ||
+    $("input").value.trim() ||
+    ($("importDialog").open && $("importText").value.trim())
+  ) {
     event.preventDefault();
     event.returnValue = "";
   }
+});
+window.addEventListener("pagehide", saveSession);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") saveSession();
 });
 async function initialize() {
   $("sidebar").inert = true;
@@ -1160,12 +1281,14 @@ async function initialize() {
         preserveCurrent: false,
       });
       hasSaved = true;
+      needsMigration = storageRevision === "legacy";
       autosave = saved.autosave;
       $("autosave").checked = autosave;
       notice("已载入此前保存的图谱、快照与视图。");
     } else if (saved?.legacy) {
       workspace = new Workspace(saved.legacy, { demo: saved.demo });
       hasSaved = true;
+      needsMigration = true;
       workspace.view.animate = !motion.matches;
       workspace.addEventListener("change", workspaceChanged);
       notice(
@@ -1179,11 +1302,33 @@ async function initialize() {
   }
   if (motion.matches) workspace.view.animate = false;
   syncGraph();
+  const transient = readTabState();
+  if (transient) {
+    query = transient.query.trim().toLocaleLowerCase();
+    typeFilter = transient.typeFilter;
+    stateFilter = transient.stateFilter;
+    $("search").value = transient.query;
+    $("stateFilter").value = stateFilter;
+    selected = nodeMap.has(transient.selected) ? transient.selected : null;
+    listPage = transient.listPage;
+    timelinePage = transient.timelinePage;
+    edgePage = transient.edgePage;
+    renderFilters();
+    applyFilters();
+    timelineModeChanged(transient.timelineMode);
+    timelinePage = transient.timelinePage;
+    sky.setSelection(selected);
+    showView(transient.view);
+    renderInspector();
+    if (transient.camera) sky.setCamera(transient.camera);
+  }
   dirty = false;
   viewVersion = 0;
   saveLabel();
   $("app").setAttribute("aria-busy", "false");
   document.body.dataset.ready = "true";
   updateDrawer();
+  sessionReady = true;
+  saveSession();
 }
 initialize();

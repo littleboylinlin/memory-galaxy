@@ -32,8 +32,15 @@
           <div><strong id="sourceCount">—</strong><span>来源</span></div>
         </div>
         <div class="header-actions">
-          <span id="saveStatus" class="save-status">正在载入</span
-          ><button
+          <div class="save-controls">
+            <span id="saveStatus" class="save-status" role="status"
+              >正在载入</span
+            >
+            <button class="btn primary" id="quickSaveBtn" disabled>
+              保存到本机
+            </button>
+          </div>
+          <button
             class="btn icon-button mobile-menu"
             id="menuBtn"
             aria-controls="sidebar"
@@ -151,6 +158,9 @@
           <label class="check-row"
             ><input type="checkbox" id="autosave" />自动保存到本机</label
           >
+          <p class="small muted">
+            编辑后先「应用更改」，再「保存到本机」。只有本机保存成功，刷新后才能恢复修改。
+          </p>
           <div class="actions">
             <button class="btn" id="backupBtn">下载完整备份</button
             ><button class="btn" id="restoreBackupBtn">恢复完整备份</button>
@@ -477,7 +487,7 @@
               <ul class="preview-records" id="previewRecords"></ul>
             </details>
             <section id="conflictSection" hidden>
-              <h3 id="conflictCount">冲突处理</h3>
+              <h3>冲突处理</h3>
               <label for="conflictPolicy" class="conflict-policy"
                 >批量处理策略<select id="conflictPolicy">
                   <option value="review">逐项确认</option>
@@ -521,6 +531,9 @@
         hidden
       ></ul>
       <footer class="import-footer">
+        <span id="conflictCount" class="conflict-progress" role="status"
+          >等待校验</span
+        >
         <p class="small import-privacy">
           仅在本地处理，内容不会发送给模型或外部服务。
         </p>
@@ -591,6 +604,9 @@
             />标记为敏感内容（不会自动加密）</label
           >
           <p class="small muted wide">
+            「应用更改」仅更新当前工作区；关闭编辑后，请点击「保存到本机」。
+          </p>
+          <p class="small muted wide">
             手动修改会记录本机来源和修改时间，原有来源追溯会保留。现有 ID
             保持稳定。原始引用保留在来源追溯中，不会改挂到本机来源下。
           </p>
@@ -598,7 +614,7 @@
         </div>
         <footer class="dialog-footer">
           <button type="button" class="btn" data-close="nodeDialog">取消</button
-          ><button type="submit" class="btn primary">保存记忆</button>
+          ><button type="submit" class="btn primary">应用更改</button>
         </footer>
       </form>
     </dialog>
@@ -620,22 +636,51 @@
           </button>
         </header>
         <div class="dialog-body form-grid">
-          <label class="wide"
-            >起点 ID<input
+          <div class="wide endpoint-picker">
+            <label for="edgeFrom">起点记忆</label>
+            <input
               class="field"
               id="edgeFrom"
-              list="nodeChoices"
+              type="search"
               required
-              maxlength="256" /></label
-          ><label class="wide"
-            >终点 ID<input
+              maxlength="256"
+              autocomplete="off"
+              placeholder="搜索记忆标题"
+              aria-controls="edgeFromResults"
+              aria-describedby="edgeFromHint"
+              aria-expanded="false"
+            />
+            <p id="edgeFromHint" class="small muted"></p>
+            <ul
+              id="edgeFromResults"
+              class="endpoint-results"
+              aria-label="起点搜索结果"
+              hidden
+            ></ul>
+          </div>
+          <div class="wide endpoint-picker">
+            <label for="edgeTo">终点记忆</label>
+            <input
               class="field"
               id="edgeTo"
-              list="nodeChoices"
+              type="search"
               required
-              maxlength="256" /></label
-          ><datalist id="nodeChoices"></datalist
-          ><label
+              maxlength="256"
+              autocomplete="off"
+              placeholder="搜索记忆标题"
+              aria-controls="edgeToResults"
+              aria-describedby="edgeToHint"
+              aria-expanded="false"
+            />
+            <p id="edgeToHint" class="small muted"></p>
+            <ul
+              id="edgeToResults"
+              class="endpoint-results"
+              aria-label="终点搜索结果"
+              hidden
+            ></ul>
+          </div>
+          <label
             >关系类型<input
               class="field"
               id="edgeType"
@@ -659,13 +704,16 @@
             ></textarea>
           </label>
           <p class="small muted wide">
+            「应用更改」仅更新当前工作区；关闭编辑后，请点击「保存到本机」。
+          </p>
+          <p class="small muted wide">
             关系由你明确创建，不会根据布局距离或相似内容自动编造。起点与终点必须是现有节点。
           </p>
           <p id="edgeError" class="form-error wide" role="alert" hidden></p>
         </div>
         <footer class="dialog-footer">
           <button type="button" class="btn" data-close="edgeDialog">取消</button
-          ><button type="submit" class="btn primary">保存关系</button>
+          ><button type="submit" class="btn primary">应用更改</button>
         </footer>
       </form>
     </dialog>

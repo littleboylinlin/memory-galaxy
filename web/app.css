@@ -174,6 +174,51 @@ textarea::placeholder {
   font-size: 11px;
   color: var(--muted);
 }
+.save-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.save-status[data-state="pending"] {
+  color: #f2cb84;
+}
+.endpoint-results {
+  list-style: none;
+  padding: 8px;
+  max-height: 230px;
+  overflow: auto;
+  border: 1px solid #465572;
+  border-radius: 8px;
+  background: #080f1f;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0;
+  box-shadow: 0 12px 28px #0008;
+}
+.endpoint-picker {
+  position: relative;
+}
+.endpoint-results button {
+  width: 100%;
+  text-align: left;
+  padding: 10px 6px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+}
+.endpoint-results button:hover,
+.endpoint-results button:focus-visible {
+  background: #22334d;
+}
+.endpoint-picker p {
+  overflow-wrap: anywhere;
+}
 .workbench {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
@@ -1154,6 +1199,24 @@ dialog {
     font-size: 9px;
   }
   .save-status {
+    display: block;
+    font-size: 9px;
+    max-width: 120px;
+    line-height: 1.2;
+  }
+  .save-controls {
+    flex-direction: column;
+    gap: 3px;
+  }
+  .save-controls .btn {
+    font-size: 11px;
+    padding: 5px 8px;
+    min-height: 30px;
+  }
+  .header-actions {
+    gap: 7px;
+  }
+  .header-stats div:not(:first-child) {
     display: none;
   }
   .mobile-menu {

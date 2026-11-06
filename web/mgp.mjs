@@ -840,7 +840,7 @@ function withProvenance(record, sourceId, existing) {
   next.provenance = [...provenance.values()];
   return next;
 }
-function updatedRecord(previous, next) {
+export function updatedRecord(previous, next) {
   const merged = { ...previous, ...next };
   if (previous.source_id !== next.source_id)
     for (const key of ["source_ref", "revision"])

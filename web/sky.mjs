@@ -20,6 +20,7 @@ export class Sky {
       onMove = () => {},
       onStatus = () => {},
       onZoom = () => {},
+      onViewport = () => {},
     } = {},
   ) {
     this.canvas = canvas;
@@ -28,6 +29,7 @@ export class Sky {
     this.onMove = onMove;
     this.onStatus = onStatus;
     this.onZoom = onZoom;
+    this.onViewport = onViewport;
     this.nodes = [];
     this.edges = [];
     this.positions = new Float32Array();
@@ -192,6 +194,27 @@ export class Sky {
       pinned: this.pins.has(node.id),
     }));
   }
+  getCamera() {
+    return {
+      zoom: this.zoom,
+      x: -this.pan.x / this.zoom,
+      y: -this.pan.y / this.zoom,
+    };
+  }
+  setCamera({ zoom, x, y }) {
+    if (
+      !Number.isFinite(zoom) ||
+      zoom < 0.000001 ||
+      zoom > 6 ||
+      ![x, y].every((v) => Number.isFinite(v) && Math.abs(v) <= 1e9)
+    )
+      return;
+    this.cameraTouched = true;
+    this.zoom = zoom;
+    this.pan = { x: -x * zoom, y: -y * zoom };
+    this.onZoom(zoom);
+    this.invalidate();
+  }
   setPinned(id, pinned) {
     const index = this.indices.get(id);
     if (index === undefined) return;
@@ -275,6 +298,7 @@ export class Sky {
       };
     }
     this.onZoom(this.zoom);
+    if (!automatic) this.onViewport();
     this.invalidate();
   }
   focus(id) {
@@ -287,6 +311,7 @@ export class Sky {
       y: -this.positions[index * 2 + 1] * this.zoom,
     };
     this.onZoom(this.zoom);
+    this.onViewport();
     this.invalidate();
   }
   scale(
@@ -302,6 +327,7 @@ export class Sky {
       y: y - this.canvas.clientHeight / 2 - world.y * this.zoom,
     };
     this.onZoom(this.zoom);
+    this.onViewport();
     this.invalidate();
   }
   hit(x, y) {
@@ -595,6 +621,7 @@ export class Sky {
           y: mid.y - canvas.clientHeight / 2 - this.gesture.world.y * this.zoom,
         };
         this.onZoom(this.zoom);
+        this.onViewport();
         this.invalidate();
         return;
       }
@@ -621,6 +648,7 @@ export class Sky {
           x: gesture.pan.x + point.x - gesture.start.x,
           y: gesture.pan.y + point.y - gesture.start.y,
         };
+      if (gesture.node === undefined) this.onViewport();
       this.invalidate();
     });
     const finish = (event, cancelled = false) => {
@@ -669,6 +697,7 @@ export class Sky {
       else handled = false;
       if (handled) {
         this.cameraTouched = true;
+        this.onViewport();
         event.preventDefault();
         this.invalidate();
       }

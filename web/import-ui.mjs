@@ -1,5 +1,6 @@
 import { emptyGraph, graphSources, LIMITS } from "./mgp.mjs";
 import { ImportClient } from "./import-client.mjs";
+import { conflictDiff } from "./field-diff.mjs";
 const $ = (id) => document.getElementById(id);
 const el = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -125,6 +126,7 @@ export class ImportUi {
     $("importErrors").hidden = true;
     $("analyzeImport").disabled = false;
     $("importDialog").setAttribute("aria-busy", "false");
+    $("conflictCount").textContent = "等待校验";
   }
   show() {
     if (!$("importDialog").open) $("importDialog").showModal();
@@ -405,6 +407,8 @@ export class ImportUi {
       conflicts.length.toLocaleString() +
       " 项 · 待处理 " +
       unresolved.toLocaleString() +
+      " 项 · 已处理 " +
+      (conflicts.length - unresolved).toLocaleString() +
       " 项";
     $("conflictPage").textContent = this.#page + 1 + " / " + pages;
     $("conflictPrevious").disabled = this.#page === 0;
@@ -415,18 +419,83 @@ export class ImportUi {
     )) {
       const card = el("article", undefined, "conflict-card");
       card.append(el("h4", labels[conflict.kind] + " · " + conflict.id));
-      const comparison = el("div", undefined, "conflict-comparison");
-      for (const [label, value] of [
-        ["当前记录", conflict.existing],
-        ["导入记录", conflict.incoming],
-      ]) {
-        const column = el("details"),
-          heading = el("summary", label),
-          pre = el("pre", JSON.stringify(value, null, 2));
-        column.append(heading, pre);
-        comparison.append(column);
+      card.append(
+        el(
+          "p",
+          conflict.resolution === "incoming"
+            ? "已选择：采用导入"
+            : conflict.resolution === "keep"
+              ? "已选择：保留当前"
+              : "待处理：请选择处理方式",
+          "conflict-resolution",
+        ),
+      );
+      const table = el("table", undefined, "field-diff"),
+        head = el("thead"),
+        row = el("tr"),
+        body = el("tbody");
+      for (const title of ["字段 / 变化", "当前值", "采用导入后的值"])
+        row.append(el("th", title));
+      head.append(row);
+      const valueText = (value) => {
+        if (value === undefined) return "未提供";
+        const text =
+          typeof value === "string"
+            ? value || '""（空文本）'
+            : JSON.stringify(value);
+        return text.length > 1200
+          ? text.slice(0, 1200) + "…（完整值见 JSON 详情）"
+          : text;
+      };
+      for (const change of conflictDiff(conflict)) {
+        const row = el("tr");
+        row.dataset.change = change.kind;
+        const field = el("th", change.field.join("."));
+        field.scope = "row";
+        field.append(
+          el(
+            "span",
+            { added: "新增字段", removed: "移除字段", changed: "值不同" }[
+              change.kind
+            ],
+            "diff-kind",
+          ),
+        );
+        row.append(
+          field,
+          el("td", valueText(change.before)),
+          el("td", valueText(change.after)),
+        );
+        body.append(row);
       }
-      card.append(comparison);
+      table.append(head, body);
+      card.append(
+        table,
+        el(
+          "p",
+          "未提供的可选字段按协议保留；跨来源的引用和 revision 不继承，原始来源追溯仍保留。",
+          "small muted",
+        ),
+      );
+      const raw = el("details", undefined, "conflict-json");
+      raw.append(el("summary", "完整 JSON 与原始导入值"));
+      const comparison = el("div", undefined, "conflict-comparison");
+      raw.append(comparison);
+      raw.ontoggle = () => {
+        if (!raw.open || comparison.childElementCount) return;
+        for (const [label, value] of [
+          ["当前记录", conflict.existing],
+          ["原始导入记录", conflict.incoming],
+        ]) {
+          const column = el("div");
+          column.append(
+            el("h5", label),
+            el("pre", JSON.stringify(value, null, 2)),
+          );
+          comparison.append(column);
+        }
+      };
+      card.append(raw);
       const label = el("label", "处理方式"),
         select = el("select");
       select.setAttribute("aria-label", "处理冲突 " + conflict.id);
