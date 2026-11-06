@@ -36,6 +36,7 @@ for (const file of [
   "import-ui.mjs",
   "backup-ui.mjs",
   "insights-ui.mjs",
+  "topic-pack-ui.mjs",
 ]) {
   const source = await readFile("web/" + file, "utf8");
   for (const match of source.matchAll(
