@@ -255,6 +255,37 @@ test("title choices distinguish duplicate names and preserve stable relation ide
   expect(after.edges[0].to).toBe(ids[1]);
 });
 
+test("an open endpoint search cannot move the cancel button during a single click", async ({
+  page,
+}) => {
+  await apply(
+    page,
+    batch([
+      { id: "start", label: "起点", type: "memory" },
+      { id: "target", label: "同名候选", type: "project" },
+    ]),
+  );
+  await page.locator("#tab-list").click();
+  await page.locator("#nodeList button").first().click();
+  await page.locator("#addEdgeBtn").click();
+  await page.locator("#edgeTo").fill("候选");
+  await expect(page.locator("#edgeToResults")).toBeVisible();
+  await page
+    .locator('#edgeDialog button[data-close="edgeDialog"]')
+    .last()
+    .click();
+  await expect(page.locator("#confirmTitle")).toHaveText("放弃未应用的编辑");
+  await page.locator("#cancelAction").click();
+  await expect(page.locator("#edgeTo")).toHaveValue("候选");
+  await page
+    .locator('#edgeDialog button[data-close="edgeDialog"]')
+    .last()
+    .click();
+  await page.locator("#confirmAction").click();
+  await expect(page.locator("#edgeDialog")).not.toBeVisible();
+  await expect(page.locator("#edgeCount")).toHaveText("0");
+});
+
 test("field differences are visible by default and decisions remain explicit with original provenance", async ({
   page,
 }) => {

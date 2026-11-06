@@ -185,12 +185,21 @@ textarea::placeholder {
 .endpoint-results {
   list-style: none;
   padding: 8px;
-  margin: 6px 0;
   max-height: 230px;
   overflow: auto;
   border: 1px solid #465572;
   border-radius: 8px;
   background: #080f1f;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0;
+  box-shadow: 0 12px 28px #0008;
+}
+.endpoint-picker {
+  position: relative;
 }
 .endpoint-results button {
   width: 100%;

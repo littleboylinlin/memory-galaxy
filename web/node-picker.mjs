@@ -35,7 +35,9 @@ export class NodePicker {
       this.render();
       this.onChange();
     };
-    this.input.onfocus = () => this.render();
+    this.input.onfocus = () => {
+      if (!this.id) this.render();
+    };
     this.input.onkeydown = (event) => {
       if (event.key === "ArrowDown") {
         event.preventDefault();
