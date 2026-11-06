@@ -294,8 +294,8 @@ export function healthCheck(graph, { now = Date.now(), staleDays = 90 } = {}) {
           ids: ids.sort(identifierOrder),
           reason:
             kind === "title"
-              ? "类型与标题在忽略大小写、全角和连续空白后相同；同名不等于同一记忆。"
-              : "非空正文在忽略大小写、全角和连续空白后相同；这里只检查字面线索，不判断事实是否重复。",
+              ? "类型与标题在统一大小写、兼容字符与连续空白后相同；同名不等于同一记忆。"
+              : "非空正文在统一大小写、兼容字符与连续空白后相同；这里只检查字面线索，不判断事实是否重复。",
         });
       }
   return result;

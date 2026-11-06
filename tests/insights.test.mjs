@@ -322,6 +322,15 @@ test("literal duplicate clues preserve full membership and never equate same nam
     ],
   );
   assert.match(result.duplicates[0].reason, /同名不等于同一记忆/);
+  const compatible = healthCheck(
+    graph([
+      node("x", { label: "①", content: "" }),
+      node("y", { label: "1", content: "" }),
+    ]),
+    { now },
+  );
+  assert.deepEqual(compatible.duplicates[0].ids, ["x", "y"]);
+  assert.match(compatible.duplicates[0].reason, /兼容字符/);
   assert.equal(data.nodes.length, 5);
 });
 test("isolation uses only existing other-node edges and explains self-only links", () => {
