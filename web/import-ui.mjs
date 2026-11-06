@@ -129,6 +129,10 @@ export class ImportUi {
     $("conflictCount").textContent = "等待校验";
   }
   show() {
+    if (!$("importDialog").open)
+      $("importEditor").open = !matchMedia(
+        "(max-width: 760px), (max-width: 1100px) and (max-height: 600px)",
+      ).matches;
     if (!$("importDialog").open) $("importDialog").showModal();
   }
   cancelSession() {
@@ -244,6 +248,7 @@ export class ImportUi {
           );
         button.type = "button";
         button.onclick = () => {
+          $("importEditor").open = true;
           const input = $("importText");
           input.focus();
           if (issue.line) {
@@ -266,6 +271,14 @@ export class ImportUi {
           }
         };
         item.append(button);
+        if (issue.detail) {
+          const details = el("details", undefined, "issue-details");
+          details.append(
+            el("summary", "原始技术信息"),
+            el("pre", issue.detail),
+          );
+          item.append(details);
+        }
         list.append(item);
       }
       if ((error.issues?.length || 0) >= LIMITS.issues)

@@ -49,7 +49,11 @@ test("false full coverage not inferred", () => {
   g.source.completeness = "full";
   assert.match(validateMgp(g).warnings.join(" "), /无法独立证明/);
 });
-test("bad JSON rejected", () => assert.throws(() => parseMgp("{"), /解析失败/));
+test("bad JSON rejected", () =>
+  assert.throws(
+    () => parseMgp("{"),
+    (error) => error.name === "MgpError" && error.issues[0].code === "json",
+  ));
 test("oversized input rejected", () => {
   const g = clone(example);
   g.nodes[0].content = "x".repeat(100001);

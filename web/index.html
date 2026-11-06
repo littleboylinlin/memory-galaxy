@@ -2,7 +2,10 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#080b17" />
     <meta
       http-equiv="Content-Security-Policy"
@@ -395,14 +398,14 @@
             </div>
             <h2 id="detailTitle" tabindex="-1"></h2>
             <span id="detailState" class="state-badge"></span>
-            <p id="detailContent" class="detail-content"></p>
-            <div id="detailTags" class="tags"></div>
-            <dl id="detailMeta" class="metadata"></dl>
-            <div class="actions">
+            <div class="actions inspector-actions">
               <button class="btn" id="editNodeBtn">编辑记忆</button
               ><button class="btn" id="pinNodeBtn">固定位置</button
               ><button class="btn danger-text" id="deleteNodeBtn">删除</button>
             </div>
+            <p id="detailContent" class="detail-content"></p>
+            <div id="detailTags" class="tags"></div>
+            <dl id="detailMeta" class="metadata"></dl>
             <div class="section-heading">
               <h3 id="detailLinkCount">关联关系</h3>
               <button class="text-button" id="addEdgeBtn">＋ 关系</button>
@@ -447,29 +450,34 @@
         </button>
       </header>
       <div class="import-body">
-        <section class="import-editor" aria-label="导入内容">
-          <div id="importOrigin" class="import-origin"></div>
-          <label for="importText">完整批次内容</label>
-          <p id="importTextHint" class="small muted" hidden></p>
-          <textarea
-            class="field"
-            id="importText"
-            aria-describedby="importTextHint"
-            wrap="off"
-            maxlength="12582912"
-            autocapitalize="off"
-            spellcheck="false"
-            placeholder="粘贴 MGP JSON 或 JSONL"
-          ></textarea>
-          <p class="small muted">
-            支持 MGP 1.0 / 1.1，单批不超过 12 MiB。JSONL 使用一条 header
-            记录与逐行的 node / edge 记录。
-          </p>
-          <button type="button" class="btn" id="analyzeImport">重新校验</button>
-          <p class="small muted">
-            缺少的节点不会被自动删除。只有带删除记录、并经你确认的操作才会移除数据。
-          </p>
-        </section>
+        <details class="import-editor" id="importEditor" open>
+          <summary>查看与修改原始 JSON</summary>
+          <div class="import-editor-body">
+            <div id="importOrigin" class="import-origin"></div>
+            <label for="importText">完整批次内容</label>
+            <p id="importTextHint" class="small muted" hidden></p>
+            <textarea
+              class="field"
+              id="importText"
+              aria-describedby="importTextHint"
+              wrap="off"
+              maxlength="12582912"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="粘贴 MGP JSON 或 JSONL"
+            ></textarea>
+            <p class="small muted">
+              支持 MGP 1.0 / 1.1，单批不超过 12 MiB。JSONL 使用一条 header
+              记录与逐行的 node / edge 记录。
+            </p>
+            <button type="button" class="btn" id="analyzeImport">
+              重新校验
+            </button>
+            <p class="small muted">
+              缺少的节点不会被自动删除。只有带删除记录、并经你确认的操作才会移除数据。
+            </p>
+          </div>
+        </details>
         <section class="import-preview" aria-label="导入差异预览">
           <div id="importPreview" hidden>
             <span class="preview-format" id="previewFormat"></span>
@@ -766,6 +774,10 @@
       <div class="dialog-body">
         <ul id="restoreSummary" class="restore-summary"></ul>
         <div id="restoreStatus" class="notice" role="status"></div>
+        <details id="restoreErrorDetails" class="issue-details" hidden>
+          <summary>原始技术信息</summary>
+          <pre id="restoreErrorText"></pre>
+        </details>
         <p class="small muted">
           完整备份会替换整个工作区；若要合并图谱，请使用 MGP 导入。
         </p>

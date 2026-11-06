@@ -107,6 +107,23 @@ test("JSON syntax errors include a line and column", () => {
     (error) => error.issues[0].line === 2 && error.issues[0].column > 1,
   );
 });
+test("JSON syntax errors lead with Chinese repair guidance and retain technical details", () => {
+  assert.throws(
+    () => parseMgp('{\n "protocol": }'),
+    (error) => {
+      const issue = error.issues[0];
+      assert.equal(issue.line, 2);
+      assert.equal(issue.column, 14);
+      assert.match(issue.message, /需要.*JSON.*值/);
+      assert.doesNotMatch(
+        issue.message,
+        /Unexpected|Expected|position|SyntaxError/,
+      );
+      assert.ok(issue.detail.length > 0);
+      return true;
+    },
+  );
+});
 test("JSONL round trips data and keeps stable IDs", () => {
   const graph = batch(
     [node("test:one"), node("test:two")],

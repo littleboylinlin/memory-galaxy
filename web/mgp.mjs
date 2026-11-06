@@ -1,4 +1,5 @@
 /** Memory Graph Protocol: validation, import planning, and incremental updates. */
+import { jsonSyntaxIssue as syntaxIssue } from "./json-errors.mjs";
 export const PROTOCOL = "mgp/1.1";
 export const SUPPORTED_PROTOCOLS = ["mgp/1.0", PROTOCOL];
 export const LIMITS = Object.freeze({
@@ -445,20 +446,6 @@ export function validateMgp(value, knownIds = []) {
     };
   }
 }
-function syntaxIssue(error, text, lineOffset = 0) {
-  const match = error.message.match(/position (\d+)/i),
-    direct = error.message.match(/line (\d+) column (\d+)/i);
-  const offset = match ? Math.min(text.length, Number(match[1])) : text.length;
-  const before = text.slice(0, offset),
-    lines = before.split("\n");
-  return {
-    path: "$",
-    code: "json",
-    message: "JSON 解析失败：" + error.message,
-    line: lineOffset + (direct ? Number(direct[1]) : lines.length),
-    column: direct ? Number(direct[2]) : lines.at(-1).length + 1,
-  };
-}
 function locateIssues(text, issues) {
   const wanted = new Set(["$"]),
     positions = new Map();
@@ -578,8 +565,20 @@ export function parseMgp(input, knownIds = []) {
     let header;
     try {
       header = JSON.parse(lines.find((s) => s.trim()) || "");
-    } catch {
-      throw new MgpError([syntaxIssue(parseError, body)]);
+    } catch (headerError) {
+      throw new MgpError([
+        parseError
+          ? syntaxIssue(parseError, body)
+          : {
+              ...syntaxIssue(
+                headerError,
+                lines.find((s) => s.trim()) || "",
+                lines.findIndex((s) => s.trim()),
+              ),
+              message:
+                "JSONL 的 header 需要完整放在一行，请勿将同一条记录拆行。",
+            },
+      ]);
     }
     if (header?.kind !== "header")
       throw new MgpError([syntaxIssue(parseError, body)]);
