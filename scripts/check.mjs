@@ -31,7 +31,12 @@ for (const match of page.matchAll(
   for (const id of match[1].split(/\s+/))
     if (!knownIds.has(id))
       throw new Error("Missing labelled or controlled element: " + id);
-for (const file of ["app.mjs", "import-ui.mjs", "backup-ui.mjs"]) {
+for (const file of [
+  "app.mjs",
+  "import-ui.mjs",
+  "backup-ui.mjs",
+  "insights-ui.mjs",
+]) {
   const source = await readFile("web/" + file, "utf8");
   for (const match of source.matchAll(
     /(?:\$|document\.getElementById)\("([^"]+)"\)/g,

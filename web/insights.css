@@ -1,0 +1,208 @@
+.insight-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.insight-toolbar label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #b9c8e0;
+}
+.insight-toolbar select {
+  min-height: 40px;
+}
+.insight-note {
+  color: #b7c5de;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.insight-rules {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 14px 0;
+  color: #b7c5de;
+}
+.insight-rules summary,
+.review-relations summary,
+.duplicate-members summary {
+  cursor: pointer;
+  color: #c6b6f4;
+}
+.insight-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+.insight-card {
+  border: 1px solid #354765;
+  background: #131c30;
+  border-radius: 12px;
+  padding: 18px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.insight-card h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.insight-card h4 {
+  font-size: 12px;
+  margin: 18px 0 7px;
+  color: #d4c6f6;
+}
+.insight-record-heading {
+  display: flex;
+  gap: 10px;
+  align-items: start;
+  justify-content: space-between;
+}
+.insight-record-heading .badge {
+  flex-shrink: 0;
+}
+.insight-id {
+  font-size: 11px;
+  color: #b4c8e5;
+}
+.insight-body {
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.insight-source {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #a3b4d0;
+  white-space: pre-wrap;
+  max-height: 150px;
+  overflow: auto;
+}
+.review-reasons {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #c6d4eb;
+  padding-left: 19px;
+}
+.review-reasons li + li {
+  margin-top: 7px;
+}
+.insight-actions {
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.insight-actions .btn {
+  min-height: 40px;
+}
+.review-action[aria-pressed="true"] {
+  background: #413263;
+  border-color: #a18aca;
+}
+.review-relations {
+  font-size: 12px;
+  margin-top: 16px;
+}
+.review-relations ul {
+  padding-left: 15px;
+}
+.review-relations li {
+  margin: 12px 0;
+}
+.review-relations p {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: #b7c5de;
+}
+.health-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.health-categories [aria-pressed="true"] {
+  background: #413263;
+  border-color: #a18aca;
+}
+.health-node {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #354765;
+}
+.health-card > p {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.duplicate-members {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.duplicate-members .pagination {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.view-nav [role="tablist"] {
+  min-width: 0;
+  flex: 1;
+}
+@media (max-width: 760px), (max-width: 1100px) and (max-height: 600px) {
+  .insight-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .insight-card {
+    padding: 14px;
+  }
+  .insight-toolbar {
+    gap: 10px;
+  }
+  .insight-toolbar label {
+    flex: 1 1 135px;
+  }
+  .insight-toolbar select {
+    width: 100%;
+  }
+  .insight-toolbar > .btn {
+    flex: 1 1 110px;
+  }
+  .view-nav [role="tablist"] {
+    gap: 18px;
+  }
+  .health-categories .chip {
+    min-height: 38px;
+  }
+}
+@media (max-width: 1100px) and (max-height: 600px) and (orientation: landscape) {
+  #panel-review,
+  #panel-health {
+    padding: 16px 20px 30px;
+  }
+  #panel-review .page-heading,
+  #panel-health .page-heading {
+    margin-bottom: 14px;
+  }
+  #panel-review .page-heading h2,
+  #panel-health .page-heading h2 {
+    margin: 5px 0;
+    font-size: 20px;
+  }
+  #panel-review .page-heading .eyebrow,
+  #panel-health .page-heading .eyebrow {
+    display: none;
+  }
+  .insight-toolbar {
+    align-items: center;
+  }
+  .insight-toolbar label {
+    flex: 0 1 auto;
+  }
+  .insight-toolbar > .btn {
+    flex: 0 1 auto;
+  }
+}
+
+#reviewStatus:empty {
+  display: none;
+}

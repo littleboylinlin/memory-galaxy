@@ -15,6 +15,7 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./app.css" />
     <link rel="stylesheet" href="./import.css" />
+    <link rel="stylesheet" href="./insights.css" />
   </head>
   <body>
     <a class="skip-link" href="#mainArea">跳到记忆工作区</a>
@@ -207,6 +208,24 @@
               >
                 记忆列表</button
               ><button
+                id="tab-review"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-review"
+                data-view="review"
+                tabindex="-1"
+              >
+                回顾</button
+              ><button
+                id="tab-health"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-health"
+                data-view="health"
+                tabindex="-1"
+              >
+                体检</button
+              ><button
                 id="tab-timeline"
                 role="tab"
                 aria-selected="false"
@@ -299,6 +318,119 @@
               <button class="btn" id="listPrevious">上一页</button
               ><span id="listPage"></span
               ><button class="btn" id="listNext">下一页</button>
+            </div>
+          </section>
+          <section
+            id="panel-review"
+            class="view-panel content-panel"
+            role="tabpanel"
+            aria-labelledby="tab-review"
+            aria-busy="false"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">RETURN TO YOUR MEMORIES</span>
+                <h2>记忆回顾</h2>
+                <p>
+                  按本地规则找回旧记忆，沿已有关系继续阅读。查看卡片不会自动标记已回顾。
+                </p>
+              </div>
+            </div>
+            <div class="insight-toolbar">
+              <label for="reviewMode"
+                >查看范围<select id="reviewMode">
+                  <option value="due">待回顾的旧记忆</option>
+                  <option value="favorites">收藏</option>
+                  <option value="reviewed">已回顾记录</option>
+                  <option value="skipped">跳过记录</option>
+                  <option value="undated">未提供可用时间</option>
+                  <option value="all">全部记忆</option>
+                </select></label
+              >
+              <label for="reviewAge"
+                >旧记忆的更新时间阈值<select id="reviewAge">
+                  <option value="30">至少 30 天</option>
+                  <option value="90">至少 90 天</option>
+                  <option value="180">至少 180 天</option>
+                </select></label
+              >
+              <button class="btn" id="refreshReview">刷新回顾</button>
+              <button class="btn danger-text" id="clearReviews">
+                清除回顾状态
+              </button>
+            </div>
+            <p class="insight-note">
+              沿用现有查找与筛选。回顾状态单独保存到此浏览器，不进入记忆导出或工作区备份。
+            </p>
+            <details class="insight-rules">
+              <summary>回顾筛选与保存规则</summary>
+              <p>
+                只使用记录提供的更新时间，不将它当作发生、创建或确认时间。缺失或晚于本机时钟的时间不用于推荐旧记忆；可切换范围主动查看。待回顾不含已过时记录；已回顾的同版本暂缓
+                30 天，跳过暂缓 7
+                天。记忆、来源或原有关系改变后旧标记不再延后推荐，收藏仍按稳定
+                ID 保留。请勿将不同记忆复用同一 ID。
+              </p>
+              <p>
+                操作只记录本机实际标记时间，不推断你此前的回顾历史。状态保存成功后才反馈完成；清理浏览器站点数据会丢失这些状态。清除工作区缓存不会清除回顾状态，后者可在此页单独清除。
+              </p>
+            </details>
+            <p id="reviewStatus" class="notice" role="status"></p>
+            <p id="reviewSummary" class="insight-note" role="status"></p>
+            <div id="reviewCards" class="insight-cards"></div>
+            <div id="reviewPagination" class="pagination" hidden>
+              <button class="btn" id="reviewPrevious">上一页</button
+              ><span id="reviewPage"></span
+              ><button class="btn" id="reviewNext">下一页</button>
+            </div>
+          </section>
+          <section
+            id="panel-health"
+            class="view-panel content-panel"
+            role="tabpanel"
+            aria-labelledby="tab-health"
+            aria-busy="false"
+            hidden
+          >
+            <div class="page-heading">
+              <div>
+                <span class="eyebrow">CHECK WITH EVIDENCE</span>
+                <h2>记忆体检</h2>
+                <p>
+                  检查当前工作区的字面重复线索、孤立节点、来源追溯和待核实旧记录，只提供结果和操作建议。
+                </p>
+              </div>
+            </div>
+            <div class="insight-toolbar">
+              <label for="healthAge"
+                >待核实记录的更新时间阈值<select id="healthAge">
+                  <option value="30">至少 30 天</option>
+                  <option value="90" selected>至少 90 天</option>
+                  <option value="180">至少 180 天</option>
+                </select></label
+              ><button class="btn" id="runHealth">重新检查</button>
+            </div>
+            <p class="insight-note">
+              检查整个当前图谱，不受工具栏筛选影响，不检查历史快照或删除墓碑。只依据现有记录；不会自动合并、删除、修改或推断关系。各项可重叠，不相加为“错误总数”。
+            </p>
+            <details class="insight-rules">
+              <summary>如何理解检查结果</summary>
+              <p>
+                重复检查忽略大小写、全角和连续空白，分别比较同类型标题与非空正文，不进行语义判断。孤立指未与其他记忆相连，自关联不算外部连接；孤立本身不一定有问题。来源项区分缺失声明与已声明但缺少原文引用，手动记录的来源不要求外部引用。长期项仅包含未知、推测、有争议状态，依据提供的更新时间，不等同最后确认时间；已确认与已过时状态不计入。
+              </p>
+            </details>
+            <p id="healthSummary" class="insight-note" role="status"></p>
+            <div
+              id="healthCategories"
+              class="health-categories"
+              aria-label="体检项目"
+            ></div>
+            <p id="healthAdvice" class="insight-note"></p>
+            <div id="healthResults" class="insight-cards"></div>
+            <div id="healthPagination" class="pagination" hidden>
+              <button class="btn" id="healthPrevious">上一页</button
+              ><span id="healthPage"></span
+              ><button class="btn" id="healthNext">下一页</button>
             </div>
           </section>
           <section
