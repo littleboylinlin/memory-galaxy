@@ -62,6 +62,7 @@ function validCalendar(s) {
       (Number(s.slice(-5, -3)) < 24 && Number(s.slice(-2)) < 60))
   );
 }
+export { timestamp as isMgpTimestamp };
 export const edgeKey = (edge) =>
   edge.id
     ? "id:" + edge.id

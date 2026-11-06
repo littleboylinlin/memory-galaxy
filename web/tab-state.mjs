@@ -1,7 +1,15 @@
 import { NODE_TYPES, NODE_STATES } from "./mgp.mjs";
 
 export const TAB_STATE_KEY = "memory-galaxy:tab-state:1";
-const views = ["graph", "list", "timeline", "history", "sources"];
+const views = [
+  "graph",
+  "list",
+  "review",
+  "health",
+  "timeline",
+  "history",
+  "sources",
+];
 const page = (value) =>
   Number.isSafeInteger(value) && value >= 0 && value <= 1000000 ? value : 0;
 
@@ -10,6 +18,7 @@ export function tabState(value) {
   const camera = value.camera;
   return {
     version: 1,
+    ...(value.insights ? { insights: insightTabState(value.insights) } : {}),
     view: views.includes(value.view) ? value.view : "graph",
     query: typeof value.query === "string" ? value.query.slice(0, 500) : "",
     typeFilter: NODE_TYPES.includes(value.typeFilter)
@@ -37,6 +46,30 @@ export function tabState(value) {
       )
         ? { zoom: camera.zoom, x: camera.x, y: camera.y }
         : null,
+  };
+}
+
+export function insightTabState(value) {
+  return {
+    reviewMode: [
+      "due",
+      "favorites",
+      "reviewed",
+      "skipped",
+      "undated",
+      "all",
+    ].includes(value?.reviewMode)
+      ? value.reviewMode
+      : "due",
+    reviewAge: [30, 90, 180].includes(value?.reviewAge) ? value.reviewAge : 30,
+    reviewPage: page(value?.reviewPage),
+    healthKind: ["duplicates", "isolated", "sources", "stale"].includes(
+      value?.healthKind,
+    )
+      ? value.healthKind
+      : "duplicates",
+    healthAge: [30, 90, 180].includes(value?.healthAge) ? value.healthAge : 90,
+    healthPage: page(value?.healthPage),
   };
 }
 

@@ -21,6 +21,7 @@ import { Sky, PALETTE } from "./sky.mjs";
 import { GROUP_NAMES } from "./layout.mjs";
 import { readTabState, writeTabState } from "./tab-state.mjs";
 import { NodePicker } from "./node-picker.mjs";
+import { InsightsUi } from "./insights-ui.mjs";
 const $ = (id) => document.getElementById(id);
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -141,6 +142,7 @@ function saveSession() {
     timelineMode,
     selected,
     camera: sky.getCamera(),
+    insights: insights.tabState(),
   });
 }
 function scheduleSession() {
@@ -191,6 +193,7 @@ function currentView() {
 function syncGraph({ restoredView = false } = {}) {
   const changed = graphReference !== workspace.graph;
   if (changed) {
+    insights.invalidate();
     if (graphReference && !restoredView && !workspace.demo) {
       const ids = new Set(workspace.graph.nodes.map((node) => node.id));
       workspace.view.positions = sky
@@ -228,6 +231,15 @@ function syncGraph({ restoredView = false } = {}) {
   renderHistory();
   renderSources();
 }
+const insights = new InsightsUi({
+  getGraph: () => workspace.graph,
+  getFilteredIds: () => filtered.map((node) => node.id),
+  isExample: () => workspace.demo,
+  hasPendingWorkspace: () => dirty || saving > 0 || hasDraft(),
+  onLocate: locate,
+  onConfirm: ask,
+  onSessionChange: scheduleSession,
+});
 workspace.addEventListener("change", workspaceChanged);
 function workspaceChanged(event) {
   syncGraph({ restoredView: event.detail.label === "恢复完整备份" });
@@ -306,6 +318,7 @@ function applyFilters() {
     `当前筛选 ${filtered.length.toLocaleString()} 条 / 共 ${workspace.graph.nodes.length.toLocaleString()} 条。选择标题可定位到星盘并查看详情。`;
   if (view === "list") renderList();
   if (view === "timeline") renderTimeline();
+  insights.filtersChanged();
   scheduleSession();
 }
 function stateBadge(node) {
@@ -374,6 +387,7 @@ function showView(next, focus = false) {
   if (next === "history") renderHistory();
   if (next === "sources") renderSources();
   if (next === "graph") sky.resize();
+  insights.activate(next);
   $("inspector").hidden = next !== "graph" || !selected;
   if (focus) $("tab-" + next).focus();
   scheduleSession();
@@ -1227,7 +1241,7 @@ $("clearSaveBtn").onclick = () => {
   ask(
     "清除本机缓存",
     (externalSave ? "其他页面已更新保存，继续会清除其保存内容。" : "") +
-      "删除这个浏览器保存的图谱、快照和视图，并关闭自动保存。当前页面的数据仍保留，请按需先下载完整备份。",
+      "删除这个浏览器保存的图谱、快照和视图，并关闭自动保存。当前页面数据与独立回顾状态仍保留；回顾状态可在回顾页清除。请按需先下载完整备份。",
     async () => {
       autosave = false;
       $("autosave").checked = false;
@@ -1246,7 +1260,9 @@ $("clearSaveBtn").onclick = () => {
         hasSaved = false;
         saveLabel();
         channel?.postMessage({ cleared: true });
-        notice("本机缓存已清除，自动保存已关闭。当前页面里的数据仍保留。");
+        notice(
+          "本机缓存已清除（仅工作区），自动保存已关闭。当前页面数据与独立回顾状态仍保留；回顾状态可在回顾页清除。",
+        );
       } catch (error) {
         if (error instanceof StorageConflictError) pauseAutosave();
         notice("清除缓存失败：" + error.message, true);
@@ -1259,6 +1275,7 @@ window.addEventListener("beforeunload", (event) => {
   if (
     dirty ||
     saving ||
+    insights.pending ||
     hasDraft() ||
     $("input").value.trim() ||
     ($("importDialog").open && $("importText").value.trim())
@@ -1306,6 +1323,7 @@ async function initialize() {
   syncGraph();
   const transient = readTabState();
   if (transient) {
+    insights.restoreTabState(transient.insights);
     query = transient.query.trim().toLocaleLowerCase();
     typeFilter = transient.typeFilter;
     stateFilter = transient.stateFilter;
