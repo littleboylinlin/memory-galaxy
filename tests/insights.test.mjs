@@ -296,6 +296,8 @@ test("personal actions merge unrelated status fields, preserve actual action tim
     (v) => (v.secret = "raw body"),
     (v) => (v.reviewed.at = "yesterday"),
     (v) => (v.reviewed.fingerprint = "x"),
+    (v) =>
+      (v.skipped = { ...v.reviewed, until: new Date(now + DAY).toISOString() }),
     (v) => (v.id = "\n"),
   ]) {
     const invalid = structuredClone(old);

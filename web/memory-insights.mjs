@@ -167,7 +167,9 @@ export async function reviewPage(
       reasons.push(
         reviewedCurrent
           ? `本机上次标记已回顾：${state.reviewed.at}。`
-          : "当前记忆、来源或已有关系与上次回顾版本不同，或本机回顾时间晚于当前时钟；未据此延后推荐。",
+          : state.reviewed.fingerprint !== (item.version || versions.get(id))
+            ? "当前记忆、来源或已有关系与上次回顾版本不同，未据此延后推荐。"
+            : `本机回顾标记 ${state.reviewed.at} 晚于当前时钟，未据此延后推荐。`,
       );
     else
       reasons.push("此浏览器没有此稳定 ID 的已回顾记录；不代表你从未回顾过。");
@@ -175,7 +177,9 @@ export async function reviewPage(
       reasons.push(
         skippedCurrent
           ? `本机跳过至 ${state.skipped.until}${Date.parse(state.skipped.until) <= now ? "（已到期）" : ""}。`
-          : "跳过记录属于其他内容版本，或时间晚于当前时钟，当前版本不受其暂缓。",
+          : state.skipped.fingerprint !== (item.version || versions.get(id))
+            ? "跳过记录属于其他内容版本，当前版本不受其暂缓。"
+            : `本机跳过标记 ${state.skipped.at} 晚于当前时钟，未据此暂缓。`,
       );
     const edges = index.edges.get(id);
     reasons.push(
@@ -276,7 +280,7 @@ export function healthCheck(graph, { now = Date.now(), staleDays = 90 } = {}) {
     )
       result.stale.push({
         id: node.id,
-        reason: `当前状态为 ${node.state || "unknown"}，记录提供的更新时间 ${node.updated_at} 距今至少 ${staleDays} 天；这不代表最后确认时间。`,
+        reason: `当前状态为 ${{ unknown: "未知", inferred: "推测", disputed: "有争议" }[node.state || "unknown"]}，记录提供的更新时间 ${node.updated_at} 距今至少 ${staleDays} 天；这不代表最后确认时间。`,
       });
   }
   for (const [kind, groups] of [

@@ -576,6 +576,14 @@ for (const size of [
     data.nodes[0].content = '<img src=x onerror="alert(1)">';
     await apply(page, data);
     await open(page, "review");
+    if (size.height < 600) {
+      const heading = await card(page, "review:a").locator("h3").boundingBox();
+      const panel = await page.locator("#panel-review").boundingBox();
+      expect(heading.y).toBeGreaterThanOrEqual(panel.y);
+      expect(heading.y + heading.height).toBeLessThanOrEqual(
+        panel.y + panel.height,
+      );
+    }
     await expect(card(page, "review:a")).toContainText("<img");
     await expect(page.locator("#reviewCards img")).toHaveCount(0);
     await card(page, "review:a")

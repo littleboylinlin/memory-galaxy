@@ -256,7 +256,8 @@ export class InsightsUi {
   renderReview(result, graph) {
     this.reviewPage = result.page;
     $("reviewSummary").textContent =
-      `${result.total.toLocaleString()} 条符合当前筛选 · 全工作区 ${result.missingTime} 条无可用更新时间、${result.futureTime} 条时间晚于本机时钟。计算基准：${result.computedAt}`;
+      `${result.total.toLocaleString()} 条符合当前筛选 · 全工作区 ${result.missingTime} 条无可用更新时间、${result.futureTime} 条时间晚于本机时钟。`;
+    $("reviewBasis").textContent = "本次本机计算基准：" + result.computedAt;
     const wrap = $("reviewCards"),
       nodes = new Map(graph.nodes.map((node) => [node.id, node])),
       edges = new Map(graph.nodes.map((node) => [node.id, []]));
@@ -353,7 +354,8 @@ export class InsightsUi {
       graph = this.resultGraph;
     if (!result || graph !== this.getGraph()) return;
     $("healthSummary").textContent =
-      `${this.isExample() ? "示例体检 · " : ""}检查 ${result.nodes.toLocaleString()} 条记忆、${result.edges.toLocaleString()} 条关系 · ${result.missingTime} 条缺少可用更新时间、${result.futureTime} 条时间晚于本机时钟，无法据此判断长期未确认。基准：${result.computedAt}`;
+      `${this.isExample() ? "示例体检 · " : ""}检查 ${result.nodes.toLocaleString()} 条记忆、${result.edges.toLocaleString()} 条关系 · ${result.missingTime} 条缺少可用更新时间、${result.futureTime} 条时间晚于本机时钟（这些时间不用于判断长期）。`;
+    $("healthBasis").textContent = "本次本机计算基准：" + result.computedAt;
     $("healthCategories").replaceChildren();
     for (const [key, [name]] of Object.entries(kinds)) {
       const button = el(

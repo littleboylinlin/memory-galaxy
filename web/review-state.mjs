@@ -33,6 +33,7 @@ export function validateReviewRecord(value) {
     value.id.length > 256 ||
     /[\u0000-\u001f]/.test(value.id) ||
     typeof value.favorite !== "boolean" ||
+    (value.reviewed !== undefined && value.skipped !== undefined) ||
     (value.reviewed !== undefined && !marker(value.reviewed)) ||
     (value.skipped !== undefined && !marker(value.skipped, true))
   )
