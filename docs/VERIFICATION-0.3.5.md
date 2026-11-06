@@ -23,6 +23,8 @@ JSON 的接受与拒绝仍由原来的原生解析器、协议校验器决定，
 
 合并后按现有流程构建并发布 0.3.5，核对线上 revision、27 个公开文件的 SHA-256，并执行线上 Chromium 部署冒烟检查。发布是否成功以 main 对应的 Actions 结果和线上构建清单为准。
 
+首次 main 发布流程中，Firefox 的 Ubuntu 依赖从 Azure 镜像下载过慢，约 20 分钟后作业取消，未进入页面测试。重试仍停留在依赖安装阶段，因此 CI 在浏览器安装前移除运行器镜像列表中的 Azure 项，沿用列表中已有的 Ubuntu 官方 HTTPS 归档及安全镜像；保留签名校验、依赖安装、四组浏览器和发布门槛。列表格式依据 [GitHub 运行器的配置脚本](https://github.com/actions/runner-images/blob/main/images/ubuntu/scripts/build/configure-apt-sources.sh)，不修改应用或协议内容。
+
 ## 未验证范围
 
 竖屏与横屏使用浏览器视口及触摸模拟，不是真实 iPhone 或 Android 实测。未验证实体设备的刘海安全区、系统键盘、动态地址栏和真实旋转动画。没有本轮真实 AI 导出文件；不能把合成数据回归写成该文件已通过。

@@ -64,6 +64,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Use Ubuntu HTTPS package mirrors
+        run: sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
       - run: npx playwright install --with-deps "${{ matrix.browser }}"
       - run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
       - run: npm run test:e2e -- --project="${{ matrix.project }}"
@@ -148,6 +150,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run verify:site -- --url "$SITE_URL" --revision "$EXPECTED_REVISION" --manifest dist/build-info.json --attempts 6
+      - name: Use Ubuntu HTTPS package mirrors
+        run: sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
       - run: npx playwright install --with-deps chromium
       - run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
       - name: Browser smoke checks on Pages
