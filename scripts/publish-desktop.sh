@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-branch=feature/cross-platform-desktop
-pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls")
-head=$(jq -er --arg sha "$GITHUB_SHA" --arg branch "$branch" '
-  map(select(.merged_at != null and .base.ref == "main" and .merge_commit_sha == $sha and .head.ref == $branch))
-  | select(length == 1) | .[0].head.sha | select(test("^[0-9a-f]{40}$"))
-' <<<"$pr")
+branch=fix/macos-offline-probe
+feature_branch=feature/cross-platform-desktop
+feature_commit=5ada577517821348832f2fdd113b1e217454ae13
+merged_head() {
+  local commit=$1 name=$2 pr
+  pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit/pulls")
+  jq -er --arg sha "$commit" --arg branch "$name" '
+    map(select(.merged_at != null and .base.ref == "main" and .merge_commit_sha == $sha and .head.ref == $branch))
+    | select(length == 1) | .[0].head.sha | select(test("^[0-9a-f]{40}$"))
+  ' <<<"$pr"
+}
+head=$(merged_head "$GITHUB_SHA" "$branch")
+feature_head=$(merged_head "$feature_commit" "$feature_branch")
 test "$(jq -r .version package.json)" = 0.7.0
 
 stage=$(mktemp -d)
@@ -58,11 +65,15 @@ for file in "$stage"/MemoryGalaxy-* "$stage/SHA256SUMS.txt"; do
     'any(.assets[]; .name == $name and .digest == $digest)' <<<"$published"
 done
 
-ref="refs/heads/$branch"
-actual=$(git ls-remote origin "$ref" | cut -f 1)
-if [[ -n "$actual" ]]; then
-  test "$actual" = "$head"
-  gh auth setup-git --hostname github.com
-  git push --force-with-lease="$ref:$head" origin ":$ref"
-fi
-test -z "$(git ls-remote origin "$ref")"
+remove_merged_branch() {
+  local ref="refs/heads/$1" expected=$2 actual
+  actual=$(git ls-remote origin "$ref" | cut -f 1)
+  if [[ -n "$actual" ]]; then
+    test "$actual" = "$expected"
+    git push --force-with-lease="$ref:$expected" origin ":$ref"
+  fi
+  test -z "$(git ls-remote origin "$ref")"
+}
+gh auth setup-git --hostname github.com
+remove_merged_branch "$branch" "$head"
+remove_merged_branch "$feature_branch" "$feature_head"
