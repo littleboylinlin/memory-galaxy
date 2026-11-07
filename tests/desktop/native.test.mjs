@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
   mkdir,
   mkdtemp,
@@ -53,6 +55,20 @@ async function close(app) {
     .catch(() => {});
   const [code] = await exited;
   assert.equal(code, 0);
+}
+
+async function terminate(app) {
+  const child = app.process();
+  const exited = once(child, "exit");
+  if (process.platform === "win32")
+    await promisify(execFile)("taskkill.exe", [
+      "/PID",
+      String(child.pid),
+      "/T",
+      "/F",
+    ]);
+  else process.kill(-child.pid, "SIGKILL");
+  await exited;
 }
 
 async function choose(app, { open, save }) {
@@ -164,13 +180,17 @@ test(
     ({ app, page } = await start(profile, t));
     await expect(page.locator("#desktopPath")).toContainText(custom);
     await expect(page.locator("#nodeCount")).toHaveText("2");
-    const exit = once(app.process(), "exit");
-    app.process().kill("SIGKILL");
-    await exit;
+    t.diagnostic(
+      "Installed launch, offline core operations, folder change, and normal relaunch verified.",
+    );
+    await terminate(app);
 
     ({ app, page } = await start(profile, t));
     await expect(page.locator("#nodeCount")).toHaveText("2");
     await expect(page.locator("#edgeCount")).toHaveText("1");
+    t.diagnostic(
+      "Full process tree was terminated and the installed app reopened its committed state.",
+    );
     await choose(app, { save: backup });
     await openTools(page);
     await page.locator("#backupBtn").click();
@@ -223,6 +243,9 @@ test(
       ),
     );
     await close(app);
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 3 });
+    t.diagnostic(
+      "Complete backup, cancellation, restore, and pre-restore backup verified.",
+    );
   },
 );

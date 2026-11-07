@@ -7,6 +7,7 @@ import {
   session,
 } from "electron";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { readFile, mkdir, realpath, lstat } from "node:fs/promises";
 import { join, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -355,24 +356,33 @@ function createWindow() {
   void window.loadURL(entry);
 }
 
-if (!app.requestSingleInstanceLock()) app.quit();
-else {
-  app.on("second-instance", () => {
-    if (!window) return;
-    if (window.isMinimized()) window.restore();
-    window.focus();
-  });
-  app.on("window-all-closed", () => app.quit());
-  app.on("will-quit", () => library?.close());
-  app
-    .whenReady()
-    .then(async () => {
-      await startup();
-      wire();
-      createWindow();
-    })
-    .catch((error) => {
-      dialog.showErrorBox("Memory Galaxy 无法启动", error.message);
-      app.exit(1);
-    });
+app.on("second-instance", () => {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.focus();
+});
+app.on("window-all-closed", () => app.quit());
+app.on("will-quit", () => library?.close());
+
+async function start() {
+  let locked = app.requestSingleInstanceLock();
+  if (!locked && process.platform === "win32") {
+    // A terminated Windows process can briefly leave the profile lock busy.
+    await delay(500);
+    locked = app.requestSingleInstanceLock();
+  }
+  if (!locked) {
+    console.warn("Memory Galaxy profile is in use.");
+    app.quit();
+    return;
+  }
+  await app.whenReady();
+  await startup();
+  wire();
+  createWindow();
 }
+
+start().catch((error) => {
+  dialog.showErrorBox("Memory Galaxy 无法启动", error.message);
+  app.exit(1);
+});
