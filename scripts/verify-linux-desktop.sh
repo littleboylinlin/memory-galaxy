@@ -11,8 +11,11 @@ cp "$appimage" "$stage/Memory Galaxy.AppImage"
 chmod +x "$stage/Memory Galaxy.AppImage"
 
 test "$(dpkg-deb -f "$deb" Architecture)" = amd64
-sudo apt-get install -y --no-install-recommends --download-only "$deb"
-sudo unshare --net -- apt-get install -y --no-install-recommends --no-download "$deb"
+mkdir -p "$stage/archives"
+sudo apt-get install -y --no-install-recommends --download-only -o "Dir::Cache::archives=$stage/archives" "$deb"
+shopt -s nullglob
+dependencies=("$stage"/archives/*.deb)
+sudo unshare --net -- dpkg -i "${dependencies[@]}" "$deb"
 exe=$(dpkg-query -L memory-galaxy | awk '/^\/opt\/.*\/memory-galaxy$/')
 test -x "$exe"
 test "$(stat -c %u "$exe")" = 0

@@ -69,7 +69,9 @@ test(
     assert.ok(actual.reviews[0].reviewed);
     assert.ok(actual.packs[0].baseline.nodes.length);
     await close(app);
-    assert.ok((await stat(join(profile, "library", DATABASE_NAME))).size > 0);
+    const database = await stat(join(profile, "library", DATABASE_NAME));
+    assert.ok(database.size > 0);
+    if (process.platform !== "win32") assert.equal(database.mode & 0o077, 0);
     if (mode === "seed")
       await writeFile(report, JSON.stringify(actual), { flag: "wx" });
     else assert.deepEqual(actual, JSON.parse(await readFile(report, "utf8")));

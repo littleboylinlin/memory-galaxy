@@ -12,7 +12,7 @@
 
 Windows 安装程序未签名，系统可能提示未知发布者。macOS 应用带临时签名（ad-hoc），无 Developer ID 签名和 Apple 公证。Gatekeeper 可能阻止带下载隔离标记的应用首次打开，受管设备可能禁止例外。系统允许时，可参考 Apple 的官方说明对该应用单独授权。[Apple 的 Gatekeeper 说明](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac)
 
-三平台发行包都自带 Chromium 和 SQLite。Linux 需要桌面环境及系统库，deb 安装时如缺少依赖，需先准备相应软件包。AppImage 的挂载方式依赖系统的 FUSE 支持，发行包也支持 `APPIMAGE_EXTRACT_AND_RUN=1 ./MemoryGalaxy-0.7.0-linux-x86_64.AppImage`。测试环境保留 Chromium 沙盒，Linux 上应用能否启用沙盒取决于发行版的用户命名空间与安全策略。
+三平台发行包都自带 Chromium 和 SQLite。Linux 需要桌面环境及系统库，deb 安装时如缺少依赖，需先准备相应软件包。AppImage 的挂载方式依赖系统的 FUSE 支持，发行包也支持 `APPIMAGE_EXTRACT_AND_RUN=1 ./MemoryGalaxy-0.7.0-linux-x86_64.AppImage`。Linux 桌面版要求 Chromium 沙盒可用。若发行版的用户命名空间策略限制 AppImage，可用 deb 的系统集成方式安装。
 
 首次打开会看到示例星图。导入 MGP 或添加第一条自己的记忆即可开始。图谱修改点击「应用更改」后自动保存，看到「已保存到本机」表示 SQLite 事务已提交。回顾、收藏和主题包配置走同一资料库。主题包草稿仍需点击「保存配置」。关闭主窗口会退出程序。退出时会等待待写入的工作区和界面状态，有草稿或写入错误时会提示。
 
@@ -26,7 +26,7 @@ Windows 安装程序未签名，系统可能提示未知发布者。macOS 应用
 
 每个配置目录的 `library-location.json` 记录数据文件夹，默认 SQLite 文件位于该配置目录的 `library/memory-galaxy.sqlite3`。工具栏会显示当前路径。点击「更换数据文件夹」后，应用会确认是打开已有资料库，还是把现有资料复制到新位置。旧文件夹保留其原有资料。
 
-请用当前账户可读写的本地目录保存资料。SQLite 回滚日志位于资料库同目录，异常退出后由 SQLite 处理。启动时会检查 SQLite 结构、资料库版本和每条记录的 SHA-256。校验失败时保留原资料库，可选择其他资料库或在新目录从备份恢复。磁盘写满、文件权限或 I/O 故障会中止事务。已应用但尚未写入的图谱可通过「另存工作区备份」保留。
+请用当前账户可读写的本地目录保存资料。macOS 和 Linux 新建的 SQLite 文件默认只对当前账户开放。SQLite 回滚日志位于资料库同目录，异常退出后由 SQLite 处理。启动时会检查 SQLite 结构、资料库版本和每条记录的 SHA-256。校验失败时保留原资料库，可选择其他资料库或在新目录从备份恢复。磁盘写满、文件权限或 I/O 故障会中止事务。已应用但尚未写入的图谱可通过「另存工作区备份」保留。
 
 ## 完整备份与迁移
 
