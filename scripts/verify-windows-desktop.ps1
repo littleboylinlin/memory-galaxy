@@ -24,6 +24,11 @@ Invoke-WebRequest -Uri 'https://github.com/littleboylinlin/memory-galaxy/release
 if ((Get-FileHash -Algorithm SHA256 $previous).Hash.ToLowerInvariant() -ne '2147cd408f81b213b773b73d11ecdebc76bf1a902fbb48f138360fe3dbe67616') {
     throw '0.7.0 installer checksum mismatch'
 }
+$stable = Join-Path $env:RUNNER_TEMP 'MemoryGalaxy-Setup-0.8.0-x64.exe'
+Invoke-WebRequest -Uri 'https://github.com/littleboylinlin/memory-galaxy/releases/download/v0.8.0/MemoryGalaxy-Setup-0.8.0-x64.exe' -OutFile $stable
+if ((Get-FileHash -Algorithm SHA256 $stable).Hash.ToLowerInvariant() -ne '0f998abd6b71842c8c2afba7a66a488e6700fda2b67f9640ea4c37afecc75251') {
+    throw '0.8.0 installer checksum mismatch'
+}
 Install-Desktop $previous
 
 $exe = Join-Path $destination 'MemoryGalaxy.exe'
@@ -40,11 +45,16 @@ try {
     node --test tests/desktop/profile.test.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Seeding and exporting the 0.7.0 profile failed' }
 
-    Install-Desktop $installer.FullName
     $env:MEMORY_GALAXY_PROFILE_MODE = 'check'
+    Install-Desktop $stable
+    $env:MEMORY_GALAXY_PROFILE_VERSION = '0.8.0'
+    node --test tests/desktop/profile.test.mjs
+    if ($LASTEXITCODE -ne 0) { throw '0.7.0 to 0.8.0 upgrade acceptance failed' }
+
+    Install-Desktop $installer.FullName
     $env:MEMORY_GALAXY_PROFILE_VERSION = $version
     node --test tests/desktop/profile.test.mjs
-    if ($LASTEXITCODE -ne 0) { throw "0.7.0 to $version upgrade acceptance failed" }
+    if ($LASTEXITCODE -ne 0) { throw "0.8.0 to $version upgrade acceptance failed" }
     npm run test:desktop
     if ($LASTEXITCODE -ne 0) { throw 'Windows native acceptance failed' }
 
@@ -55,7 +65,7 @@ try {
     $uninstall = Start-Process -FilePath $uninstaller[0].FullName -ArgumentList '/S' -Wait -PassThru
     if ($uninstall.ExitCode -ne 0 -or (Test-Path $exe)) { throw 'NSIS uninstall failed' }
     if ((Get-FileHash -Algorithm SHA256 $database).Hash -ne $digest) { throw 'Uninstall changed the profile database' }
-    Write-Host 'NSIS uninstall removed the application and preserved the upgraded 0.7.0 default-profile database.'
+    Write-Host "NSIS uninstall preserved the default profile seeded by 0.7.0 and upgraded through 0.8.0 to $version."
 } finally {
     Remove-NetFirewallRule -Name $appRule.Name
 }

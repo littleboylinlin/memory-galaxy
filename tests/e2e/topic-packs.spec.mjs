@@ -273,6 +273,7 @@ test("source and sensitivity checks are visible and export always requires confi
   await expect(page.locator("#packResults")).toContainText("没有可定位原文");
   await page.locator("#packJson").click();
   await expect(page.locator("#confirmText")).toContainText("敏感线索");
+  await expect(page.locator("#confirmText")).toContainText("主题包以明文保存");
   await page.locator("#cancelAction").click();
   await expect(page.locator("#packStatus")).not.toContainText("已发起文件下载");
 });

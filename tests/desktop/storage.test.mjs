@@ -38,6 +38,7 @@ import {
   decryptBackup,
   deriveEncryption,
   isEncryptedBackup,
+  validateEncryptionPassword,
 } from "../../desktop/encryption.mjs";
 import { graph, libraryFixture } from "../fixtures/desktop.mjs";
 import { Workspace } from "../../web/workspace.mjs";
@@ -433,17 +434,52 @@ test("encrypted backups authenticate bytes and restore the existing JSON payload
   await assert.rejects(() => decryptBackup(bytes, password), /加密数据已损坏/);
 });
 
+test("encryption password limits count characters and cap encoded bytes", () => {
+  assert.doesNotThrow(() => validateEncryptionPassword("密".repeat(12)));
+  assert.doesNotThrow(() => validateEncryptionPassword("😀".repeat(256)));
+  assert.throws(() => validateEncryptionPassword("😀".repeat(11)), /至少 12/);
+  assert.throws(
+    () => validateEncryptionPassword("😀".repeat(257)),
+    /1024 字节/,
+  );
+});
+
+test("encrypted SQLite records authenticate both kind and stable ID", async () => {
+  const key = await deriveEncryption("synthetic record test password");
+  const id = key.recordId("review", "memory:synthetic");
+  const content = Buffer.from("synthetic record");
+  try {
+    const ciphertext = key.sealRecord("review", id, content);
+    assert.deepEqual(key.openRecord("review", id, ciphertext), content);
+    assert.notDeepEqual(key.sealRecord("review", id, content), ciphertext);
+    assert.throws(
+      () => key.openRecord("review", "different", ciphertext),
+      /加密数据已损坏/,
+    );
+    assert.throws(
+      () => key.openRecord("pack", id, ciphertext),
+      /加密数据已损坏/,
+    );
+  } finally {
+    key.dispose();
+  }
+});
+
 const fullDisk = process.env.MEMORY_GALAXY_FULL_DISK_DIRECTORY;
 if (fullDisk)
   test("bounded disk mount returns ENOSPC without replacing committed data", async () => {
     const path = join(fullDisk, DATABASE_NAME);
-    const library = await createLibrary(path, await libraryFixture());
+    const password = "synthetic full disk password";
+    const key = await deriveEncryption(password);
+    let library;
     try {
+      library = await createLibrary(path, await libraryFixture(), key);
       const before = library.snapshot();
-      const previous = join(fullDisk, "previous.json");
+      const previous = join(fullDisk, "previous.mgbackup");
       const text = await makeLibraryBackup(before.state);
-      await writeNewFile(previous, text);
-      const next = join(fullDisk, "next.json");
+      const encrypted = key.sealBackup(text);
+      await writeNewFile(previous, encrypted);
+      const next = join(fullDisk, "next.mgbackup");
       await assert.rejects(
         () => writeNewFile(next, Buffer.alloc(4 * 1024 ** 2)),
         { code: "ENOSPC" },
@@ -460,8 +496,10 @@ if (fullDisk)
       );
       await rm(filler);
       assert.deepEqual(library.snapshot(), before);
-      assert.equal(await readBackupFile(previous), text);
+      assert.deepEqual(await readFile(previous), encrypted);
+      assert.equal(await decryptBackup(encrypted, password), text);
     } finally {
-      library.close();
+      library?.close();
+      key.dispose();
     }
   });

@@ -1,6 +1,6 @@
 {
   "name": "memory-galaxy",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -21,7 +21,8 @@
     "desktop:pack": "electron-builder --publish never",
     "test:desktop": "node --test tests/desktop/native.test.mjs",
     "test:storage": "node --test tests/desktop/storage.test.mjs",
-    "benchmark": "node scripts/benchmark.mjs"
+    "benchmark": "node scripts/benchmark.mjs",
+    "benchmark:encryption": "node scripts/benchmark-encryption.mjs"
   },
   "engines": {
     "node": ">=22"

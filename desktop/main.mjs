@@ -6,7 +6,7 @@ import {
   protocol,
   session,
 } from "electron";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { readFile, mkdir, realpath, lstat } from "node:fs/promises";
 import { join, extname, relative, resolve } from "node:path";
@@ -28,6 +28,7 @@ import {
   decryptBackup,
   ENCRYPTED_BACKUP_OVERHEAD,
   isEncryptedBackup,
+  validateEncryptionPassword,
 } from "./encryption.mjs";
 import {
   LIBRARY_FILE_BYTES,
@@ -86,6 +87,8 @@ function trusted(event) {
 
 function storageMessage(error) {
   const sqlite = (error.errcode ?? 0) & 255;
+  if (error.code === "ENOENT")
+    return "找不到选中的文件或数据文件夹。请重新选择或检查磁盘连接。";
   if (["ENOSPC", "EDQUOT"].includes(error.code) || sqlite === 13)
     return "磁盘空间或配额不足。请释放空间后重试。";
   if (
@@ -177,7 +180,10 @@ async function activateLibrary(selected, candidate) {
 async function changeFolder(password) {
   pendingFolder = undefined;
   const encryptCopy = password !== undefined;
-  if (encryptCopy) current();
+  if (encryptCopy) {
+    current();
+    validateEncryptionPassword(password);
+  }
   const { canceled, filePaths } = await dialog.showOpenDialog(window, {
     title: encryptCopy ? "为加密副本选择新的文件夹" : "选择本地资料库文件夹",
     defaultPath: folder,
@@ -195,9 +201,9 @@ async function changeFolder(password) {
     title: "确认切换数据文件夹",
     message: selected,
     detail: encryptCopy
-      ? "完整资料将复制到加密库。原资料库保持原样，请自行保管。"
+      ? "新目录中的副本将加密。原资料库仍保留在原目录，原有明文库及导出文件仍为明文。"
       : existing
-        ? "将打开此文件夹中已有的资料库。当前文件夹中的资料会保留。"
+        ? "将按已有资料库原来的加密状态打开。当前文件夹中的资料会保留。"
         : library
           ? "将把当前完整资料复制到此文件夹并打开。原文件夹中的资料会保留。"
           : "将在此文件夹新建资料库。原资料文件会保留，之后可选择备份恢复。",
@@ -256,10 +262,11 @@ async function saveBackup(path, state, encryption) {
 
 async function exportBackup(password) {
   const store = current();
+  if (password !== undefined) validateEncryptionPassword(password);
   const encrypted = Boolean(store.encryption) || password !== undefined;
   const extension = encrypted ? "mgbackup" : "json";
   const { canceled, filePath } = await dialog.showSaveDialog(window, {
-    title: encrypted ? "保存加密的完整资料备份" : "保存完整资料备份",
+    title: encrypted ? "保存加密的完整资料备份" : "保存明文完整资料备份",
     defaultPath: join(
       app.getPath("documents"),
       backupName("backup", encrypted),
@@ -287,6 +294,9 @@ async function exportBackup(password) {
   return filePath;
 }
 
+const backupDigest = (bytes) =>
+  createHash("sha256").update(bytes).digest("hex");
+
 async function previewRestore() {
   preview = pendingBackup = undefined;
   const { canceled, filePaths } = await dialog.showOpenDialog(window, {
@@ -295,31 +305,56 @@ async function previewRestore() {
     properties: ["openFile"],
   });
   if (canceled) return null;
+  const path = filePaths[0];
   const bytes = await readBackupBytes(
-    filePaths[0],
+    path,
     LIBRARY_FILE_BYTES + ENCRYPTED_BACKUP_OVERHEAD,
   );
   if (isEncryptedBackup(bytes)) {
-    pendingBackup = filePaths[0];
+    if (bytes.length <= ENCRYPTED_BACKUP_OVERHEAD)
+      throw new Error("加密备份文件不完整。请选择另一份完整备份。");
+    pendingBackup = { path, digest: backupDigest(bytes) };
     return { encrypted: true };
   }
-  return previewBackup(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("备份文件格式无法识别或已损坏。请重新选择备份。");
+  }
+  return previewBackup(text, false);
 }
 
 async function unlockBackup(password) {
   if (!pendingBackup) throw new Error("请重新选择加密备份。");
+  validateEncryptionPassword(password);
   const bytes = await readBackupBytes(
-    pendingBackup,
+    pendingBackup.path,
     LIBRARY_FILE_BYTES + ENCRYPTED_BACKUP_OVERHEAD,
   );
-  const result = await previewBackup(await decryptBackup(bytes, password));
+  if (backupDigest(bytes) !== pendingBackup.digest) {
+    pendingBackup = undefined;
+    throw new Error("备份文件在选择后发生变化。请取消并重新选择要恢复的备份。");
+  }
+  const result = await previewBackup(
+    await decryptBackup(bytes, password),
+    true,
+  );
   pendingBackup = undefined;
   return result;
 }
 
-async function previewBackup(text) {
-  const parsed = await parseLibraryBackup(text);
-  const { generation, state } = current().snapshot();
+async function previewBackup(text, sourceEncrypted) {
+  let parsed;
+  try {
+    parsed = await parseLibraryBackup(text);
+  } catch (error) {
+    if (error instanceof SyntaxError)
+      throw new Error("备份内容无法解析。请核对文件格式或使用另一份完整备份。");
+    throw error;
+  }
+  const store = current();
+  const { generation, state } = store.snapshot();
   const next =
     parsed.kind === "library"
       ? parsed.state
@@ -331,6 +366,8 @@ async function previewBackup(text) {
     token,
     kind: parsed.kind,
     created_at: parsed.created_at,
+    sourceEncrypted,
+    targetEncrypted: Boolean(store.encryption),
     ...changes,
   };
 }
