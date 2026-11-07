@@ -45,6 +45,8 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ]);
+// Keep newly created private data and the SQLite journal owner-only on POSIX.
+if (process.platform !== "win32") process.umask(0o077);
 const profileDirectory = app.commandLine.getSwitchValue("user-data-dir");
 if (profileDirectory) app.setPath("userData", resolve(profileDirectory));
 app.commandLine.appendSwitch("disable-background-networking");
@@ -338,7 +340,7 @@ function createWindow() {
       spellcheck: false,
     },
   });
-  window.removeMenu();
+  if (process.platform !== "darwin") window.removeMenu();
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => {
     if (event.url !== entry) event.preventDefault();
@@ -365,6 +367,15 @@ app.on("window-all-closed", () => app.quit());
 app.on("will-quit", () => library?.close());
 
 async function start() {
+  // Some AppImage launchers automatically add this switch on restricted systems.
+  if (
+    process.platform === "linux" &&
+    app.isPackaged &&
+    app.commandLine.hasSwitch("no-sandbox")
+  )
+    throw new Error(
+      "系统无法启用 Chromium 沙盒。请使用支持用户命名空间的环境，或改用 deb 安装包。",
+    );
   let locked = app.requestSingleInstanceLock();
   if (!locked && process.platform === "win32") {
     // A terminated Windows process can briefly leave the profile lock busy.

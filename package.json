@@ -1,6 +1,6 @@
 {
   "name": "memory-galaxy",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "desktop": "electron .",
-    "desktop:pack": "electron-builder --win nsis --x64 --publish never",
+    "desktop:pack": "electron-builder --publish never",
     "test:desktop": "node --test tests/desktop/native.test.mjs",
     "test:storage": "node --test tests/desktop/storage.test.mjs"
   },
@@ -37,5 +37,7 @@
   "main": "desktop/main.mjs",
   "description": "Offline memory workspace and galaxy explorer",
   "author": "小男孩",
-  "productName": "Memory Galaxy"
+  "productName": "Memory Galaxy",
+  "homepage": "https://github.com/littleboylinlin/memory-galaxy",
+  "desktopName": "memory-galaxy.desktop"
 }

@@ -33,7 +33,12 @@ for (const file of files) {
             assert.match(job.if, /github\.event_name == 'push'/);
             assert.equal(job.permissions.pages, undefined);
             assert.equal(job.permissions["id-token"], undefined);
-            assert.deepEqual(job.needs.toSorted(), ["desktop", "live"]);
+            assert.deepEqual(job.needs.toSorted(), [
+              "desktop-linux",
+              "desktop-macos",
+              "desktop-windows",
+              "live",
+            ]);
           } else {
             assert.match(job.if, /github\.event_name != 'pull_request'/);
             assert.equal(job.environment.name, "github-pages");

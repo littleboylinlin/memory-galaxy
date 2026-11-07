@@ -4,10 +4,10 @@
 
 ## 桌面版
 
-Memory Galaxy 0.6.0 桌面版提供 Windows x64 安装流程。打开应用即可离线管理记忆、关系、主题包、回顾和收藏。数据以 SQLite 文件保存在可选的本地文件夹中。
+Memory Galaxy 0.7.0 桌面版提供 Windows x64、macOS Apple Silicon 与 Intel、Linux x64 发行包。打开应用即可离线管理记忆、关系、主题包、回顾和收藏。数据以 SQLite 文件保存在可选的本地文件夹中。
 
 - [安装、数据保存与迁移](docs/DESKTOP.md)
-- [0.6.0 测试报告](docs/VERIFICATION-0.6.0.md)
+- [0.7.0 测试报告](docs/VERIFICATION-0.7.0.md)
 
 ## 网页版
 

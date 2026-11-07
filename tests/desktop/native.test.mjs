@@ -14,48 +14,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { expect, _electron as electron } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { start, close, choose } from "./harness.mjs";
 import { DATABASE_NAME } from "../../desktop/library.mjs";
 import { parseLibraryBackup } from "../../web/library-backup.mjs";
 import { graph } from "../fixtures/desktop.mjs";
-
-const installed = process.env.MEMORY_GALAXY_INSTALLED_EXE;
-async function start(profile, t) {
-  await mkdir(profile, { recursive: true });
-  const app = await electron.launch({
-    ...(installed ? { executablePath: installed } : {}),
-    args: [
-      ...(installed ? [] : ["."]),
-      "--user-data-dir=" + profile,
-      "--disable-gpu",
-    ],
-    timeout: 25000,
-  });
-  t.after(() => app.close().catch(() => {}));
-  const page = await app.firstWindow();
-  await expect(page.locator("body")).toHaveAttribute("data-ready", "true", {
-    timeout: 15000,
-  });
-  assert.equal(
-    await app.evaluate(({ app }) => app.getPath("userData")),
-    profile,
-  );
-  assert.equal(await app.evaluate(({ app }) => app.getVersion()), "0.6.0");
-  assert.equal(await page.evaluate(() => typeof window.require), "undefined");
-  assert.equal(new URL(page.url()).protocol, "memory-galaxy:");
-  return { app, page };
-}
-
-async function close(app) {
-  const exited = once(app.process(), "exit");
-  await app
-    .evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0].close();
-    })
-    .catch(() => {});
-  const [code] = await exited;
-  assert.equal(code, 0);
-}
 
 async function terminate(app) {
   const child = app.process();
@@ -69,29 +32,6 @@ async function terminate(app) {
     ]);
   else process.kill(-child.pid, "SIGKILL");
   await exited;
-}
-
-async function choose(app, { open, save }) {
-  // Substitute the picker result while exercising real application IPC and local file I/O.
-  await app.evaluate(
-    ({ dialog }, { open, save }) => {
-      if (open)
-        dialog.showOpenDialog = async () => ({
-          canceled: false,
-          filePaths: [open],
-        });
-      if (save)
-        dialog.showSaveDialog = async () => ({
-          canceled: false,
-          filePath: save,
-        });
-      dialog.showMessageBox = async () => ({
-        response: 1,
-        checkboxChecked: false,
-      });
-    },
-    { open, save },
-  );
 }
 
 async function openTools(page) {
@@ -118,7 +58,7 @@ test(
     const custom = join(dir, "资料库");
     const backup = join(dir, "migration.json");
     await mkdir(custom);
-    let { app, page } = await start(profile, t);
+    let { app, page } = await start(t, { profile });
     assert.ok((await stat(join(profile, "library", DATABASE_NAME))).size > 0);
     assert.deepEqual(
       await page.evaluate(async () => {
@@ -166,7 +106,7 @@ test(
     await page.locator("#confirmAction").click();
     await expect(page.locator("#packStatus")).toContainText("已保存到本机");
 
-    await choose(app, { open: custom });
+    await choose(app, { open: custom, directory: true });
     await openTools(page);
     await Promise.all([
       page.waitForEvent("load"),
@@ -177,7 +117,7 @@ test(
     assert.ok((await stat(join(custom, DATABASE_NAME))).size > 0);
     await close(app);
 
-    ({ app, page } = await start(profile, t));
+    ({ app, page } = await start(t, { profile }));
     await expect(page.locator("#desktopPath")).toContainText(custom);
     await expect(page.locator("#nodeCount")).toHaveText("2");
     t.diagnostic(
@@ -185,7 +125,7 @@ test(
     );
     await terminate(app);
 
-    ({ app, page } = await start(profile, t));
+    ({ app, page } = await start(t, { profile }));
     await expect(page.locator("#nodeCount")).toHaveText("2");
     await expect(page.locator("#edgeCount")).toHaveText("1");
     t.diagnostic(
@@ -212,7 +152,7 @@ test(
     assert.ok(state.packs[0].baseline.nodes.length);
     await close(app);
 
-    ({ app, page } = await start(join(dir, "pc-b"), t));
+    ({ app, page } = await start(t, { profile: join(dir, "pc-b") }));
     const before = await page.locator("#nodeCount").textContent();
     await choose(app, { open: backup });
     await openTools(page);
