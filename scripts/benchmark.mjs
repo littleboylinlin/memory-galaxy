@@ -5,6 +5,7 @@ import { cpus, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
+import { benchmarkGraph } from "../tests/fixtures/benchmark.mjs";
 
 const root = resolve(process.argv[2] || ".");
 const load = (path) => import(pathToFileURL(join(root, path)).href);
@@ -23,31 +24,6 @@ const [
   load("web/layout.mjs"),
   load("web/library-backup.mjs"),
 ]);
-
-function fixture(count, links) {
-  const nodes = Array.from({ length: count }, (_, i) => ({
-    id: "n:" + i,
-    label: "m" + i,
-    type: i % 3 ? "memory" : "topic",
-    content: i % 47 ? "body" : "zephyr",
-    tags: ["g" + (i % 7)],
-  }));
-  const edges = Array.from({ length: count * links }, (_, i) => {
-    const from = Math.floor(i / links);
-    return {
-      from: nodes[from].id,
-      to: nodes[(from + (i % links) + 1) % count].id,
-      type: "link",
-      basis: "explicit",
-    };
-  });
-  return {
-    protocol: "mgp/1.1",
-    source: { id: "s", platform: "manual", completeness: "partial" },
-    nodes,
-    edges,
-  };
-}
 
 const rounded = (value) => Number(value.toFixed(2));
 const median = (values) =>
@@ -197,7 +173,7 @@ try {
     [50000, 1],
     [10000, 8],
   ]) {
-    const graph = fixture(count, links);
+    const graph = benchmarkGraph(count, links);
     const input = JSON.stringify(graph);
     const [parseMs, { graph: parsed }] = await measure(() => parseMgp(input));
     assert.equal(parsed.nodes.length, count);

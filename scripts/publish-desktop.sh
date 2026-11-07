@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version=0.8.0
+version=0.8.1
 tag=v$version
-branch=feature/reliability-v080
+branch=fix/desktop-stability-v081
 test "$(jq -r .version package.json)" = "$version"
 test "$(git ls-remote origin refs/heads/main | cut -f 1)" = "$GITHUB_SHA"
 pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls")
@@ -30,23 +30,23 @@ tag_head=$(tag_revision)
 if [[ -n "$tag_head" ]]; then test "$tag_head" = "$GITHUB_SHA"; fi
 if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
   cat > "$stage/notes.md" <<NOTES
-## Memory Galaxy 0.8.0
+## Memory Galaxy 0.8.1
 
-- 可将现有 SQLite 资料库复制到新目录并加密。原明文库可用来回退。可用自选密码导出加密完整备份。
-- 资料库复制与完整备份在写完后才发布。恢复前先保存可回滚副本。损坏文件和过期预览会阻止替换资料。
-- 桌面首次启动提供导入与迁移入口。写入失败会保留界面内容并显示重试入口。
-- 加快大图布局和重复搜索。MGP、主题包和旧版明文备份格式继续兼容。
+- 加密备份选择后若被替换，必须重新选择。截断或格式错误的备份会提示具体问题。
+- 恢复确认页明确目标库是否加密。恢复到明文库需要明确确认，明文 MGP 和主题包导出也有提示。
+- 创建加密副本与加密备份前显示密码要求和遗忘后果。原明文库及已有文件保持原样。
+- 兼容 v0.7.0、v0.8.0 资料库与备份，并复测 1 千、1 万、5 万条记忆和高密度图谱的加密写入与恢复。
 
 | 平台 | 发行包 |
 | --- | --- |
-| Windows x64 | NSIS 安装程序，支持从 0.7.0 覆盖升级 |
+| Windows x64 | NSIS 安装程序，验收从 0.7.0 经 0.8.0 覆盖升级 |
 | macOS Apple Silicon / Intel | 分别提供 arm64 和 x64 DMG |
 | Linux x64 | AppImage 和 deb |
 
 五份安装包的 SHA-256 校验值见 SHA256SUMS.txt。Windows 安装程序未签名，macOS 应用仅有 ad-hoc 签名，无 Developer ID 签名或 Apple 公证。
 
 - [安装、加密与迁移](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/DESKTOP.md)
-- [性能测试、验收范围与限制](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/VERIFICATION-0.8.0.md)
+- [加密压力测试、验收范围与限制](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/VERIFICATION-0.8.1.md)
 - [发行包对应的 CI](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
 NOTES
   gh release create "$tag" "$stage"/MemoryGalaxy-* "$stage/SHA256SUMS.txt" \

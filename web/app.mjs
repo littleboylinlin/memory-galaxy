@@ -1296,8 +1296,15 @@ if (!desktop)
     },
     onNotice: notice,
   });
-$("exportBtn").onclick = () =>
-  download(workspace.graph, "memory-galaxy.mgp.json");
+$("exportBtn").onclick = () => {
+  const exportGraph = () => download(workspace.graph, "memory-galaxy.mgp.json");
+  if (!desktopEncrypted) return exportGraph();
+  ask(
+    "导出明文星盘 JSON",
+    "此 MGP 文件包含记忆原文和关系，将以明文保存。",
+    exportGraph,
+  );
+};
 function downloadWorkspaceBackup() {
   try {
     workspace.view = currentView();

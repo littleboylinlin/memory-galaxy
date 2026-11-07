@@ -14,7 +14,8 @@ export class DesktopUi {
     $("desktopWorkspaceBackup").hidden = false;
     $("desktopEncryptedBackup").hidden = false;
     $("clearSaveBtn").hidden = true;
-    $("backupBtn").textContent = "导出完整资料备份";
+    $("backupBtn").textContent = "导出明文完整备份";
+    $("exportBtn").textContent = "导出星盘 JSON（明文）";
     $("restoreBackupBtn").textContent = "恢复备份或迁移";
     $("desktopWelcomeImport").onclick = () => $("fileInput").click();
     $("desktopWelcomeRestore").onclick = () => $("restoreBackupBtn").click();
@@ -33,7 +34,7 @@ export class DesktopUi {
       this.run(() =>
         this.promptPassword({
           title: "为加密资料库设置密码",
-          help: "将在新文件夹创建完整副本。请自行保管密码和旧资料库。",
+          help: "密码至少 12 个字符。忘记后无法解锁副本。加密只应用于新文件夹，原明文库和已有导出仍为明文。",
           confirm: true,
           action: async (password) => {
             if ((await api.changeFolder(password))?.changed) this.reload();
@@ -45,7 +46,7 @@ export class DesktopUi {
       this.run(() =>
         this.promptPassword({
           title: "为这份备份设置密码",
-          help: "恢复备份时需要此密码。请自行保管。",
+          help: "密码至少 12 个字符。忘记后将无法从这份加密备份恢复。",
           confirm: true,
           action: (password) => this.exportBackup(password),
         }),
@@ -56,7 +57,7 @@ export class DesktopUi {
         if (preview?.encrypted)
           this.promptPassword({
             title: "解锁加密备份",
-            help: "输入导出这份备份时使用的密码。",
+            help: "输入导出这份备份时使用的密码。忘记密码时，需要另一份可用的备份。",
             action: async (password) =>
               this.showPreview(await api.unlockBackup(password)),
           });
@@ -93,11 +94,19 @@ export class DesktopUi {
 
   setStatus({ folder, error, message, locked, encrypted, welcome }) {
     $("desktopPath").textContent =
-      "数据文件夹：" + (folder || "尚未打开") + (encrypted ? " · 已加密" : "");
+      "数据文件夹：" +
+      (folder || "尚未打开") +
+      (locked
+        ? " · 加密库待解锁"
+        : error
+          ? " · 未打开"
+          : encrypted
+            ? " · 已加密"
+            : " · 明文");
     $("desktopWelcome").hidden = !welcome || Boolean(error);
     $("backupBtn").textContent = encrypted
       ? "导出加密完整备份"
-      : "导出完整资料备份";
+      : "导出明文完整备份";
     $("desktopWorkspaceBackup").textContent = "另存工作区备份（明文）";
     $("backupHelp").textContent = encrypted
       ? "资料库和默认完整备份已加密。手动导出的星盘、主题包和工作区备份仍是明文文件。"
@@ -120,7 +129,7 @@ export class DesktopUi {
   promptUnlock() {
     this.promptPassword({
       title: "解锁本地资料库",
-      help: "输入创建加密资料库时使用的密码。",
+      help: "输入创建加密资料库时使用的密码。忘记密码时，可切换至其他可打开的资料库或使用可用备份。",
       action: async (password) => {
         await this.api.unlockLibrary(password);
         this.reload();
@@ -210,6 +219,15 @@ export class DesktopUi {
     this.token = preview.token;
     $("desktopConfirmRestore").disabled = false;
     $("desktopRestoreError").hidden = true;
+    const decryptToPlain = preview.sourceEncrypted && !preview.targetEncrypted;
+    $("desktopConfirmRestore").textContent = decryptToPlain
+      ? "确认以明文恢复"
+      : "确认替换所列资料";
+    $("desktopRestoreProtection").textContent = decryptToPlain
+      ? "当前是明文资料库，确认后，恢复的内容将以明文保存在这台设备。要保留加密，请取消并切换到加密资料库。"
+      : preview.targetEncrypted
+        ? "恢复的内容和回退备份都将在当前资料库中加密保存。"
+        : "恢复的内容和回退备份将以明文保存。";
     $("desktopRestoreSummary").textContent =
       new Date(preview.created_at).toLocaleString() +
       " · " +

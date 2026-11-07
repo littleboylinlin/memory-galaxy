@@ -7,7 +7,7 @@
 Memory Galaxy 桌面版支持 Windows x64、macOS Apple Silicon 与 Intel、Linux x64。打开应用即可离线管理记忆、关系、主题包、回顾和收藏。数据以 SQLite 文件保存在本地文件夹中，0.8.0 增加可选的加密资料库副本和加密完整备份。
 
 - [安装、数据保存与迁移](docs/DESKTOP.md)
-- [0.8.0 验收范围](docs/VERIFICATION-0.8.0.md)
+- [0.8.1 验收范围](docs/VERIFICATION-0.8.1.md)
 - [正式发布与安装包](https://github.com/littleboylinlin/memory-galaxy/releases)
 
 ## 网页版

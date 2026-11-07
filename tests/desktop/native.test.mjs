@@ -19,8 +19,16 @@ import { fileURLToPath } from "node:url";
 import { expect } from "@playwright/test";
 import { start, close, choose } from "./harness.mjs";
 import { DATABASE_NAME } from "../../desktop/library.mjs";
-import { decryptBackup, isEncryptedBackup } from "../../desktop/encryption.mjs";
-import { parseLibraryBackup } from "../../web/library-backup.mjs";
+import {
+  decryptBackup,
+  deriveEncryption,
+  ENCRYPTED_BACKUP_OVERHEAD,
+  isEncryptedBackup,
+} from "../../desktop/encryption.mjs";
+import {
+  makeLibraryBackup,
+  parseLibraryBackup,
+} from "../../web/library-backup.mjs";
 import { graph, libraryFixture } from "../fixtures/desktop.mjs";
 
 async function terminate(app) {
@@ -220,8 +228,27 @@ test(
     await expect(page.locator("#nodeCount")).toHaveText("2");
     await openTools(page);
     const plainPath = join(profile, "library", DATABASE_NAME);
-    await choose(app, { open: encrypted, directory: true });
     await page.locator("#desktopEncryptCopy").click();
+    await expect(page.locator("#desktopPasswordHelp")).toContainText(
+      "原明文库和已有导出仍为明文",
+    );
+    await page.locator("#desktopPassword").fill("short");
+    await page.locator("#desktopConfirmPassword").fill("different");
+    await page.locator("#desktopSubmitPassword").click();
+    await expect(page.locator("#desktopPasswordError")).toContainText(
+      "两次输入的密码不同",
+    );
+    await app.evaluate(({ dialog }) => {
+      dialog.showOpenDialog = async () => {
+        throw new Error("Unexpected file picker for an invalid password");
+      };
+    });
+    await page.locator("#desktopConfirmPassword").fill("short");
+    await page.locator("#desktopSubmitPassword").click();
+    await expect(page.locator("#desktopPasswordError")).toContainText(
+      "至少 12 个字符",
+    );
+    await choose(app, { open: encrypted, directory: true });
     await page.locator("#desktopPassword").fill(password);
     await page.locator("#desktopConfirmPassword").fill(password);
     await Promise.all([
@@ -249,6 +276,10 @@ test(
     await expect(page.locator("#nodeCount")).toHaveText("2");
 
     await openTools(page);
+    await page.locator("#exportBtn").click();
+    await expect(page.locator("#confirmText")).toContainText("以明文保存");
+    await page.locator("#cancelAction").click();
+
     await choose(app, { save: backup, extension: "mgbackup" });
     await page.locator("#backupBtn").click();
     await expect(page.locator("#notice")).toContainText("完整资料备份已保存");
@@ -269,8 +300,45 @@ test(
     await page.locator("#desktopPassword").fill(password);
     await page.locator("#desktopSubmitPassword").click();
     await expect(page.locator("#desktopRestoreDialog")).toBeVisible();
+    await expect(page.locator("#desktopRestoreProtection")).toContainText(
+      "加密保存",
+    );
     await page.locator("#desktopCancelRestore").click();
     await expect(page.locator("#nodeCount")).toHaveText("2");
+
+    await page.locator("#restoreBackupBtn").click();
+    await expect(page.locator("#desktopPasswordDialog")).toBeVisible();
+    const altered = structuredClone(fixture);
+    altered.workspace.graph.nodes[0].content = "替换文件中的不同合成记忆";
+    const replacement = await deriveEncryption(password);
+    try {
+      await writeFile(
+        backup,
+        replacement.sealBackup(await makeLibraryBackup(altered)),
+      );
+    } finally {
+      replacement.dispose();
+    }
+    await page.locator("#desktopPassword").fill(password);
+    await page.locator("#desktopSubmitPassword").click();
+    await expect(page.locator("#desktopPasswordError")).toContainText(
+      "选择后发生变化",
+    );
+    await expect(page.locator("#desktopRestoreDialog")).not.toBeVisible();
+    await page.locator("#desktopCancelPassword").click();
+    assert.deepEqual(
+      (await page.evaluate(() => window.memoryGalaxyDesktop.loadWorkspace()))
+        .backup,
+      fixture.workspace,
+    );
+    await writeFile(backup, bytes);
+
+    const truncated = join(dir, "truncated.mgbackup");
+    await writeFile(truncated, bytes.subarray(0, ENCRYPTED_BACKUP_OVERHEAD));
+    await choose(app, { open: truncated, extension: "mgbackup" });
+    await page.locator("#restoreBackupBtn").click();
+    await expect(page.locator("#notice")).toContainText("加密备份文件不完整");
+    await expect(page.locator("#desktopPasswordDialog")).not.toBeVisible();
 
     const broken = join(dir, "damaged.json");
     await writeFile(broken, '{"format":"memory-galaxy/library-backup/1"}');
@@ -325,6 +393,111 @@ test(
     await expect(page.locator("#nodeCount")).toHaveText("2");
     assert.equal(await readFile(database, "utf8"), "damaged fixture database");
     await close(app);
+    await rm(dir, { recursive: true, force: true, maxRetries: 3 });
+  },
+);
+
+test(
+  "installed app opens Linux v0.8 encrypted files and confirms plaintext recovery",
+  { timeout: 120000 },
+  async (t) => {
+    const dir = await realpath(
+      await mkdtemp(join(tmpdir(), "memory-galaxy-portable-")),
+    );
+    const files = JSON.parse(
+      await readFile(
+        new URL("../fixtures/v080-encrypted.json", import.meta.url),
+        "utf8",
+      ),
+    );
+    const password = "synthetic v0.8 portable password";
+    const existing = join(dir, "旧加密资料");
+    const backup = join(dir, "旧加密备份.mgbackup");
+    await mkdir(existing);
+    await writeFile(
+      join(existing, DATABASE_NAME),
+      Buffer.from(files.database, "base64"),
+    );
+    const encryptedBytes = Buffer.from(files.backup, "base64");
+    await writeFile(backup, encryptedBytes);
+    const { state } = await parseLibraryBackup(
+      await decryptBackup(encryptedBytes, password),
+    );
+
+    let { app, page } = await start(t, {
+      profile: join(dir, "previous-library"),
+    });
+    await openTools(page);
+    await choose(app, { open: existing, directory: true });
+    await page.locator("#desktopFolderBtn").click();
+    await expect(page.locator("#desktopPasswordDialog")).toBeVisible();
+    await page.locator("#desktopPassword").fill(password);
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.locator("#desktopSubmitPassword").click(),
+    ]);
+    await expect(page.locator("#desktopPath")).toContainText("已加密");
+    assert.deepEqual(
+      (await page.evaluate(() => window.memoryGalaxyDesktop.loadWorkspace()))
+        .backup,
+      state.workspace,
+    );
+    assert.deepEqual(
+      await page.evaluate(() => window.memoryGalaxyDesktop.loadReviews()),
+      state.reviews,
+    );
+    const savedPack = state.packs.find((row) => !row.deleted);
+    assert.deepEqual(
+      await page.evaluate(
+        (id) => window.memoryGalaxyDesktop.loadPack(id),
+        savedPack.id,
+      ),
+      savedPack,
+    );
+    await close(app);
+
+    const profile = join(dir, "new-library");
+    ({ app, page } = await start(t, { profile }));
+    await openTools(page);
+    await choose(app, { open: backup, extension: "mgbackup" });
+    async function previewPlaintext() {
+      await page.locator("#restoreBackupBtn").click();
+      await page.locator("#desktopPassword").fill(password);
+      await page.locator("#desktopSubmitPassword").click();
+      await expect(page.locator("#desktopRestoreProtection")).toContainText(
+        "当前是明文资料库",
+      );
+      await expect(page.locator("#desktopConfirmRestore")).toHaveText(
+        "确认以明文恢复",
+      );
+    }
+    await previewPlaintext();
+    await page.locator("#desktopCancelRestore").click();
+    assert.equal(
+      await page.evaluate(() => window.memoryGalaxyDesktop.loadWorkspace()),
+      null,
+    );
+    await previewPlaintext();
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.locator("#desktopConfirmRestore").click(),
+    ]);
+    await expect(page.locator("#desktopPath")).toContainText("明文");
+    assert.deepEqual(
+      (await page.evaluate(() => window.memoryGalaxyDesktop.loadWorkspace()))
+        .backup,
+      state.workspace,
+    );
+    await close(app);
+    assert.deepEqual(await readFile(backup), encryptedBytes);
+    assert.ok(
+      (await readFile(join(profile, "library", DATABASE_NAME))).includes(
+        Buffer.from("测试原文"),
+      ),
+    );
+    t.diagnostic(
+      "Linux v0.8.0 encrypted SQLite and backup fixtures were read by the installed application.",
+    );
     await rm(dir, { recursive: true, force: true, maxRetries: 3 });
   },
 );

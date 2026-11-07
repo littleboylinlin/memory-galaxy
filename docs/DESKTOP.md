@@ -4,15 +4,15 @@
 
 | 平台                 | 文件                                       | 安装和移除                                                                                                                 |
 | -------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Windows x64          | `MemoryGalaxy-Setup-0.8.0-x64.exe`         | 关闭旧版后运行安装程序即可覆盖升级。通过 Windows 的「已安装的应用」卸载，用户资料库保留。                                  |
-| macOS Apple Silicon  | `MemoryGalaxy-0.8.0-macos-arm64.dmg`       | 打开 DMG，将 Memory Galaxy 拖到「应用程序」，然后弹出磁盘映像。移除时将应用移到废纸篓。                                    |
-| macOS Intel          | `MemoryGalaxy-0.8.0-macos-x64.dmg`         | 安装和移除方式相同。                                                                                                       |
-| Linux x64 · AppImage | `MemoryGalaxy-0.8.0-linux-x86_64.AppImage` | 用 `chmod +x` 添加执行权限后直接运行。移除时删除 AppImage 文件。                                                           |
-| Linux x64 · deb      | `MemoryGalaxy-0.8.0-linux-amd64.deb`       | 用 `sudo apt install ./MemoryGalaxy-0.8.0-linux-amd64.deb` 安装，从应用菜单启动。用 `sudo apt remove memory-galaxy` 移除。 |
+| Windows x64          | `MemoryGalaxy-Setup-0.8.1-x64.exe`         | 关闭旧版后运行安装程序即可覆盖升级。通过 Windows 的「已安装的应用」卸载，用户资料库保留。                                  |
+| macOS Apple Silicon  | `MemoryGalaxy-0.8.1-macos-arm64.dmg`       | 打开 DMG，将 Memory Galaxy 拖到「应用程序」，然后弹出磁盘映像。移除时将应用移到废纸篓。                                    |
+| macOS Intel          | `MemoryGalaxy-0.8.1-macos-x64.dmg`         | 安装和移除方式相同。                                                                                                       |
+| Linux x64 · AppImage | `MemoryGalaxy-0.8.1-linux-x86_64.AppImage` | 用 `chmod +x` 添加执行权限后直接运行。移除时删除 AppImage 文件。                                                           |
+| Linux x64 · deb      | `MemoryGalaxy-0.8.1-linux-amd64.deb`       | 用 `sudo apt install ./MemoryGalaxy-0.8.1-linux-amd64.deb` 安装，从应用菜单启动。用 `sudo apt remove memory-galaxy` 移除。 |
 
 Windows 安装程序未签名，系统可能提示未知发布者。macOS 应用带临时签名（ad-hoc），无 Developer ID 签名和 Apple 公证。Gatekeeper 可能阻止带下载隔离标记的应用首次打开，受管设备可能禁止例外。系统允许时，可参考 Apple 的官方说明对该应用单独授权。[Apple 的 Gatekeeper 说明](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac)
 
-三平台发行包都自带 Chromium 和 SQLite。Linux 需要桌面环境及系统库，deb 安装时如缺少依赖，需先准备相应软件包。AppImage 的挂载方式依赖系统的 FUSE 支持，发行包也支持 `APPIMAGE_EXTRACT_AND_RUN=1 ./MemoryGalaxy-0.8.0-linux-x86_64.AppImage`。Linux 桌面版要求 Chromium 沙盒可用。若发行版的用户命名空间策略限制 AppImage，可用 deb 的系统集成方式安装。
+三平台发行包都自带 Chromium 和 SQLite。Linux 需要桌面环境及系统库，deb 安装时如缺少依赖，需先准备相应软件包。AppImage 的挂载方式依赖系统的 FUSE 支持，发行包也支持 `APPIMAGE_EXTRACT_AND_RUN=1 ./MemoryGalaxy-0.8.1-linux-x86_64.AppImage`。Linux 桌面版要求 Chromium 沙盒可用。若发行版的用户命名空间策略限制 AppImage，可用 deb 的系统集成方式安装。
 
 首次打开可以导入已有记忆文件、从备份迁移，或先浏览示例星图。图谱修改点击「应用更改」后自动保存，看到「已保存到本机」表示 SQLite 事务已提交。回顾、收藏和主题包配置走同一资料库。主题包草稿仍需点击「保存配置」。关闭主窗口会退出程序。退出时会等待待写入的工作区和界面状态，有草稿或写入错误时会提示。
 
@@ -41,7 +41,7 @@ Windows 安装程序未签名，系统可能提示未知发布者。macOS 应用
 ## 完整备份与迁移
 
 1. 在原电脑导出完整备份，用新文件名保存 JSON 或 `.mgbackup`。备份包含图谱、来源、历史快照、操作记录、视图、主题包配置及差异基线、回顾和收藏。
-2. 把备份带到目标电脑，打开「恢复备份或迁移」。加密备份先输入密码，再核对新增、同稳定 ID 的冲突和将移除的记录数量。
+2. 把备份带到目标电脑，打开「恢复备份或迁移」。加密备份先输入密码，再核对新增、同稳定 ID 的冲突和将移除的记录数量。恢复页会标明目标资料库的加密状态。要让恢复的资料继续加密，请先打开加密资料库再恢复。
 3. 有现有资料时，应用先在当前数据文件夹写入 `memory-galaxy-before-restore-*` 完整备份，成功后提交恢复。可用这份文件回到原状态。
 
 三平台采用相同的 SQLite 资料库与 `memory-galaxy/library-backup/1` 备份格式。跨电脑迁移用完整备份，避免把配置中的绝对目录路径一并带到另一台设备。从旧版 0.5.0 的工作区备份恢复时，只替换图谱、历史和星图视图，现有主题包、回顾与收藏会保留。
@@ -55,6 +55,7 @@ Windows 安装程序未签名，系统可能提示未知发布者。macOS 应用
 在目标平台使用 Node.js 24 执行 `npm ci`、`npm run test:storage`、`npm run desktop:pack`。打包默认选择当前系统和架构，产物写入 `release/`。原生验收可将 `MEMORY_GALAXY_INSTALLED_EXE` 指向已安装的程序或 Linux AppImage，再运行 `npm run test:desktop`。Linux 需要一个可用的桌面会话或 Xvfb。
 
 - [三平台构建和验收记录](https://github.com/littleboylinlin/memory-galaxy/actions/workflows/ci.yml)
+- [0.8.1 验收范围](VERIFICATION-0.8.1.md)
 - [0.8.0 验收范围](VERIFICATION-0.8.0.md)
 - [0.7.0 验收范围](VERIFICATION-0.7.0.md)
 - [0.6.0 验收范围](VERIFICATION-0.6.0.md)

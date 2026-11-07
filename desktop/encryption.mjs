@@ -115,16 +115,20 @@ class Encryption {
   }
 }
 
-export async function deriveEncryption(
-  password,
-  salt = randomBytes(saltSize).toString("hex"),
-) {
+export function validateEncryptionPassword(password) {
   if (
     typeof password !== "string" ||
     Buffer.byteLength(password) > 1024 ||
     [...password].length < 12
   )
     throw new Error("请输入至少 12 个字符、最多 1024 字节的密码。");
+}
+
+export async function deriveEncryption(
+  password,
+  salt = randomBytes(saltSize).toString("hex"),
+) {
+  validateEncryptionPassword(password);
   if (typeof salt !== "string" || !/^[a-f0-9]{32}$/.test(salt))
     throw new Error("加密资料库的头部损坏。");
   const secret = Buffer.from(password);

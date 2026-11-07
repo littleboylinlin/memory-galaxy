@@ -692,7 +692,7 @@ export class TopicPackUi {
       checks = r.checks[mode];
     this.onConfirm(
       "确认手动导出主题包",
-      `${scope.nodes.length} 条记忆（含 ${scope.contextIds.length} 条端点上下文）、${scope.edges.length} 条包内关系；${r.selection.boundary.length + r.selection.invalid.length} 条关系不导出。来源不完整线索 ${checks.missingSources.length} 条，敏感线索 ${checks.sensitive.length} 项。规则可能误报或漏报，请在预览中核对原文、元数据及来源。${mode === "delta" ? "本次是增量包：请确认接收方已有对应完整基线；移出不代表删除原数据。" : "本次是完整主题包。"}继续仅发起本机文件下载，不会上传或发送给任何 AI。`,
+      `${scope.nodes.length} 条记忆（含 ${scope.contextIds.length} 条端点上下文）、${scope.edges.length} 条包内关系；${r.selection.boundary.length + r.selection.invalid.length} 条关系不导出。来源不完整线索 ${checks.missingSources.length} 条，敏感线索 ${checks.sensitive.length} 项。规则可能误报或漏报，请在预览中核对原文、元数据及来源。${mode === "delta" ? "本次是增量包：请确认接收方已有对应完整基线；移出不代表删除原数据。" : "本次是完整主题包。"}主题包以明文保存。继续仅发起本机文件下载，不会上传或发送给任何 AI。`,
       () => {
         try {
           if (

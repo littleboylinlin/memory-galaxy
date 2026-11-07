@@ -249,6 +249,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:storage
+      - name: Verify encrypted backup and interruption at four data sizes
+        run: npm run benchmark:encryption
       - name: Install tools and desktop runtime prerequisites
         run: |
           sudo apt-get update
@@ -266,12 +268,12 @@ jobs:
           retention-days: 14
 
   release:
-    name: Publish Memory Galaxy 0.8.0
+    name: Publish Memory Galaxy 0.8.1
     if: >-
       github.repository == 'littleboylinlin/memory-galaxy' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      github.event.before == '9b54424e43177d23a8466242670b73b1d2a77381'
+      github.event.before == '295c4f678e08bb4523ccae8ce1fd3e63b6ba102b'
     needs: [desktop-windows, desktop-macos, desktop-linux, live]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
