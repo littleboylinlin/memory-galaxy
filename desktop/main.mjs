@@ -338,7 +338,7 @@ function createWindow() {
       spellcheck: false,
     },
   });
-  window.removeMenu();
+  if (process.platform !== "darwin") window.removeMenu();
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => {
     if (event.url !== entry) event.preventDefault();

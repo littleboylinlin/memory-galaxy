@@ -19,3 +19,22 @@ nsis:
   perMachine: false
   runAfterFinish: false
   deleteAppDataOnUninstall: false
+mac:
+  target: dmg
+  icon: desktop/icon.png
+  category: public.app-category.productivity
+  identity: "-"
+  hardenedRuntime: false
+  notarize: false
+  artifactName: MemoryGalaxy-${version}-macos-${arch}.${ext}
+linux:
+  target:
+    - AppImage
+    - deb
+  executableName: memory-galaxy
+  syncDesktopName: true
+  icon: desktop/icon.png
+  category: Utility
+  artifactName: MemoryGalaxy-${version}-linux-${arch}.${ext}
+deb:
+  maintainer: 小男孩 <247175383+littleboylinlin@users.noreply.github.com>
