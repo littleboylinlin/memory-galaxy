@@ -69,7 +69,7 @@ export class InsightsUi {
     $("clearReviews").onclick = () =>
       this.onConfirm(
         "清除本机回顾状态",
-        "将清除这个浏览器的全部收藏、跳过和已回顾记录，无法撤销。记忆、关系及原有工作区备份不会改变。",
+        "将清除本机资料中的全部收藏、跳过和已回顾记录，无法撤销。记忆、关系及已导出的备份仍会保留。",
         () => this.clear(),
       );
     try {
@@ -473,7 +473,9 @@ export class InsightsUi {
     try {
       await saveReviewAction(action);
       this.status(
-        "回顾状态已保存到此浏览器。" +
+        (globalThis.memoryGalaxyDesktop
+          ? "回顾状态已写入本地资料库。"
+          : "回顾状态已保存到此浏览器。") +
           (this.hasPendingWorkspace()
             ? "记忆内容仍有未保存修改，请另行保存到本机。"
             : "记忆内容没有被修改。"),

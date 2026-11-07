@@ -19,7 +19,12 @@ import {
 import { BackupUi } from "./backup-ui.mjs";
 import { Sky, PALETTE } from "./sky.mjs";
 import { GROUP_NAMES } from "./layout.mjs";
-import { readTabState, writeTabState } from "./tab-state.mjs";
+import { readTabState, tabState, writeTabState } from "./tab-state.mjs";
+import { DesktopUi } from "./desktop-ui.mjs";
+import { makeLibraryBackup } from "./library-backup.mjs";
+import { loadPackDocuments } from "./topic-pack-store.mjs";
+import { loadReviewRecords } from "./review-state.mjs";
+const desktop = globalThis.memoryGalaxyDesktop;
 import { NodePicker } from "./node-picker.mjs";
 import { InsightsUi } from "./insights-ui.mjs";
 import { TopicPackUi } from "./topic-pack-ui.mjs";
@@ -80,7 +85,11 @@ let graphReference = null,
   hasSaved = false,
   needsMigration = false;
 let sessionReady = false,
-  sessionTimer = null;
+  sessionTimer = null,
+  sessionQueue = Promise.resolve(),
+  lastSession = "",
+  desktopReady = false,
+  desktopBusy = false;
 const editorBaselines = new Map();
 function editorValue(id) {
   return JSON.stringify(
@@ -121,7 +130,9 @@ function saveLabel() {
           ? "未保存到本机"
           : hasSaved
             ? "已保存到本机"
-            : "示例 · 未保存";
+            : desktop
+              ? "本地资料库 · 就绪"
+              : "示例 · 未保存";
   for (const id of ["saveBtn", "quickSaveBtn"]) {
     $(id).disabled = saving > 0;
     $(id).textContent = saving ? "正在保存…" : "保存到本机";
@@ -129,10 +140,8 @@ function saveLabel() {
   $("saveStatus").dataset.state =
     hasDraft() || dirty || externalSave ? "pending" : "saved";
 }
-function saveSession() {
-  if (!sessionReady) return;
-  clearTimeout(sessionTimer);
-  writeTabState({
+function currentSession() {
+  return tabState({
     version: 1,
     view,
     query: $("search").value,
@@ -148,8 +157,27 @@ function saveSession() {
     packs: packs.tabState(),
   });
 }
-function scheduleSession() {
+function saveSession(force = false) {
   if (!sessionReady) return;
+  clearTimeout(sessionTimer);
+  if (!desktop) return writeTabState(currentSession());
+  if (!desktopReady || (desktopBusy && !force)) return;
+  const state = currentSession(),
+    text = JSON.stringify(state);
+  sessionQueue = sessionQueue
+    .catch(() => {})
+    .then(async () => {
+      if (lastSession === text) return;
+      await desktop.saveTab(state);
+      lastSession = text;
+    });
+  sessionQueue.catch((error) =>
+    notice("界面状态未保存：" + error.message, true),
+  );
+  return sessionQueue;
+}
+function scheduleSession() {
+  if (!sessionReady || desktopBusy) return;
   clearTimeout(sessionTimer);
   sessionTimer = setTimeout(saveSession, 100);
 }
@@ -157,7 +185,8 @@ function markDirty() {
   dirty = true;
   viewVersion++;
   saveLabel();
-  if (autosave) {
+  if (desktopReady) void persist(false);
+  else if (autosave) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => persist(false), 650);
   }
@@ -836,14 +865,15 @@ function pauseAutosave() {
   saveLabel();
 }
 try {
-  channel = new BroadcastChannel("memory-galaxy-workspace");
-  channel.onmessage = () => {
-    pauseAutosave();
-    notice(
-      "另一个页面更新了本机存储。已暂停本页自动保存；请先备份当前数据，再决定是否覆盖。",
-      true,
-    );
-  };
+  if (!desktop) channel = new BroadcastChannel("memory-galaxy-workspace");
+  if (channel)
+    channel.onmessage = () => {
+      pauseAutosave();
+      notice(
+        "另一个页面更新了本机存储。已暂停本页自动保存；请先备份当前数据，再决定是否覆盖。",
+        true,
+      );
+    };
 } catch {}
 async function persist(manual = true) {
   clearTimeout(saveTimer);
@@ -876,7 +906,12 @@ async function persist(manual = true) {
     return;
   }
   if (!dirty && hasSaved && !needsMigration) {
-    if (manual) notice("当前工作区已保存到这个浏览器，无需重复保存。");
+    if (manual)
+      notice(
+        desktop
+          ? "当前工作区已写入资料库。"
+          : "当前工作区已保存到这个浏览器，无需重复保存。",
+      );
     return;
   }
   let backup;
@@ -912,7 +947,9 @@ async function persist(manual = true) {
       notice(
         dirty || hasDraft()
           ? "此前应用的内容已写入本机；仍有修改尚未保存，请继续应用并保存。"
-          : "图谱、快照和视图已保存到这个浏览器。IndexedDB 存储未加密。",
+          : desktop
+            ? "图谱、快照和视图已写入本地资料库。"
+            : "图谱、快照和视图已保存到这个浏览器。IndexedDB 存储未加密。",
       );
   } catch (error) {
     dirty = true;
@@ -1229,16 +1266,18 @@ new ImportUi({
     workspace.replace(graph, "导入记忆");
   },
   onNotice: notice,
+  saveInstruction: desktop ? "已应用的图谱会自动写入本地资料库。" : undefined,
 });
-new BackupUi({
-  onRestore: (backup) => {
-    workspace.restoreBackup(backup);
-  },
-  onNotice: notice,
-});
+if (!desktop)
+  new BackupUi({
+    onRestore: (backup) => {
+      workspace.restoreBackup(backup);
+    },
+    onNotice: notice,
+  });
 $("exportBtn").onclick = () =>
   download(workspace.graph, "memory-galaxy.mgp.json");
-$("backupBtn").onclick = () => {
+function downloadWorkspaceBackup() {
   try {
     workspace.view = currentView();
     download(workspace.backup(), "memory-galaxy.backup.json");
@@ -1246,7 +1285,118 @@ $("backupBtn").onclick = () => {
   } catch (error) {
     notice("无法导出完整备份：" + error.message, true);
   }
-};
+}
+$("backupBtn").onclick = downloadWorkspaceBackup;
+$("desktopWorkspaceBackup").onclick = downloadWorkspaceBackup;
+
+async function flushDesktop() {
+  if (!desktopReady) return;
+  if (insights.pending || packs.pending)
+    throw new Error("回顾或主题包正在保存，请稍后重试。");
+  if (
+    hasDraft() ||
+    packs.dirty ||
+    $("input").value.trim() ||
+    ($("importDialog").open && $("importText").value.trim())
+  )
+    throw new Error(
+      "有未应用的编辑、导入文本或主题包草稿。请先保存或结束编辑。",
+    );
+  if (dirty || saving) await persist(false);
+  if (dirty || saving)
+    throw new Error(
+      "工作区写入未完成。可返回重试或使用「另存工作区备份」保留当前图谱。",
+    );
+  await saveSession(true);
+}
+
+const desktopUi =
+  desktop &&
+  new DesktopUi({
+    api: desktop,
+    flush: flushDesktop,
+    lock: (locked) => {
+      desktopBusy = locked;
+      $("app").inert = locked;
+      if (!locked) scheduleSession();
+    },
+    notice,
+  });
+if (desktop)
+  desktop.onClosing(async () => {
+    try {
+      if (desktopBusy)
+        throw new Error("备份或资料库切换正在进行，请先返回或完成操作。");
+      await flushDesktop();
+      await desktop.finishClose();
+    } catch (error) {
+      await desktop.finishClose(error.message);
+    }
+  });
+
+if (!desktop) {
+  $("webMigrationBtn").hidden = false;
+  $("webMigrationBtn").onclick = () =>
+    ask(
+      "下载桌面迁移包",
+      "请先关闭同一星盘的其他页面。迁移包包含当前已应用的图谱、快照、视图，以及已保存的主题包、回顾和收藏。文件未加密，请自行保管。",
+      async () => {
+        $("app").inert = true;
+        try {
+          if (
+            externalSave ||
+            unreadableStorage ||
+            hasDraft() ||
+            packs.dirty ||
+            packs.pending ||
+            insights.pending ||
+            saving
+          )
+            throw new Error("请先处理未保存的草稿或存储冲突，再导出迁移包。");
+          workspace.view = currentView();
+          const version = viewVersion,
+            revision = await loadWorkspaceRevision();
+          if (revision !== storageRevision)
+            throw new Error("本机存储已变化，请重新载入页面并核对数据。");
+          const [reviews, configurations] = await Promise.all([
+            loadReviewRecords(),
+            loadPackDocuments(),
+          ]);
+          const text = await makeLibraryBackup({
+            workspace: workspace.backup(),
+            reviews,
+            packs: configurations,
+            tab: currentSession(),
+          });
+          const [latestReviews, latestPacks, latestRevision] =
+            await Promise.all([
+              loadReviewRecords(),
+              loadPackDocuments(),
+              loadWorkspaceRevision(),
+            ]);
+          if (
+            version !== viewVersion ||
+            externalSave ||
+            revision !== latestRevision ||
+            JSON.stringify(reviews) !== JSON.stringify(latestReviews) ||
+            JSON.stringify(configurations) !== JSON.stringify(latestPacks)
+          )
+            throw new Error("导出期间资料发生变化，请关闭其他页面后重试。");
+          download(
+            text,
+            "memory-galaxy.migration.json",
+            "application/json; charset=utf-8",
+          );
+          notice("迁移包已生成。打开桌面版的「恢复备份或迁移」进行核对。");
+        } catch (error) {
+          notice("无法导出迁移包：" + error.message, true);
+        } finally {
+          $("app").inert = false;
+        }
+      },
+    );
+}
+
 $("saveBtn").onclick = () => persist(true);
 $("quickSaveBtn").onclick = () => persist(true);
 $("autosave").onchange = (event) => {
@@ -1290,6 +1440,7 @@ $("clearSaveBtn").onclick = () => {
   );
 };
 window.addEventListener("beforeunload", (event) => {
+  if (desktop) return;
   saveSession();
   if (
     dirty ||
@@ -1305,14 +1456,21 @@ window.addEventListener("beforeunload", (event) => {
     event.returnValue = "";
   }
 });
-window.addEventListener("pagehide", saveSession);
+window.addEventListener("pagehide", () => saveSession());
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") saveSession();
 });
 async function initialize() {
   $("sidebar").inert = true;
   $("mainArea").inert = true;
+  let transient, desktopStatus;
   try {
+    if (desktop) {
+      desktopStatus = await desktop.status();
+      if (desktopStatus.error) throw new Error(desktopStatus.error);
+      transient = await desktop.loadTab();
+      if (transient) lastSession = JSON.stringify(transient);
+    } else transient = readTabState();
     const saved = await loadWorkspace();
     storageRevision = saved?.revision ?? null;
     if (saved?.backup) {
@@ -1322,7 +1480,7 @@ async function initialize() {
       });
       hasSaved = true;
       needsMigration = storageRevision === "legacy";
-      autosave = saved.autosave;
+      autosave = desktop ? true : saved.autosave;
       $("autosave").checked = autosave;
       notice("已载入此前保存的图谱、快照与视图。");
     } else if (saved?.legacy) {
@@ -1337,12 +1495,12 @@ async function initialize() {
     }
   } catch (error) {
     unreadableStorage = true;
+    if (desktop) desktopStatus = { ...desktopStatus, error: error.message };
     pauseAutosave();
     notice("无法读取本机工作区，原数据仍保留：" + error.message, true);
   }
   if (motion.matches) workspace.view.animate = false;
   syncGraph();
-  const transient = readTabState();
   if (transient) {
     insights.restoreTabState(transient.insights);
     packs.restoreTabState(transient.packs);
@@ -1371,6 +1529,11 @@ async function initialize() {
   document.body.dataset.ready = "true";
   updateDrawer();
   sessionReady = true;
+  desktopReady = Boolean(desktop && !unreadableStorage);
+  if (desktop) {
+    autosave = desktopReady;
+    desktopUi.setStatus(desktopStatus);
+  }
   saveSession();
 }
 initialize();

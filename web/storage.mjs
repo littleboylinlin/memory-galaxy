@@ -53,6 +53,8 @@ async function transaction(mode, operation) {
   }
 }
 export async function loadWorkspace() {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop) return desktop.loadWorkspace();
   const saved = await transaction("readonly", (store) => store.get(KEY));
   if (saved !== undefined) {
     if (saved?.backup === null)
@@ -114,6 +116,8 @@ export async function saveWorkspace(
   autosave = false,
   expectedRevision = null,
 ) {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop) return desktop.saveWorkspace(backup, expectedRevision);
   validateBackup(backup);
   return writeWorkspace({ backup, autosave }, expectedRevision);
 }

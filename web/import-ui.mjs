@@ -36,13 +36,21 @@ export class ImportUi {
   #baseRevision;
   #page = 0;
   #largeText = null;
-  constructor({ getGraph, getRevision, isExample, onApply, onNotice }) {
+  constructor({
+    getGraph,
+    getRevision,
+    isExample,
+    onApply,
+    onNotice,
+    saveInstruction = "如需下次恢复，请点击「保存到本机」。",
+  }) {
     Object.assign(this, {
       getGraph,
       getRevision,
       isExample,
       onApply,
       onNotice,
+      saveInstruction,
     });
     $("importBtn").textContent = "预览导入";
     $("importBtn").onclick = () => this.open($("input").value, "粘贴内容");
@@ -558,7 +566,8 @@ export class ImportUi {
         graph.nodes.length +
         " 个节点、" +
         graph.edges.length +
-        " 条关系；如需下次恢复，请点击「保存到本机」。",
+        " 条关系。" +
+        this.saveInstruction,
     );
   }
 }

@@ -82,7 +82,14 @@ async function read(storeName, operation) {
     database.close();
   }
 }
+export async function loadPackDocuments() {
+  return (await read(dataStore, (store) => store.getAll())).map(
+    validatePackDocument,
+  );
+}
 export async function listPacks() {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop) return desktop.listPacks();
   return (await read(summaryStore, (store) => store.getAll()))
     .map(summary)
     .sort(
@@ -91,6 +98,8 @@ export async function listPacks() {
     );
 }
 export async function loadPack(id) {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop) return desktop.loadPack(id);
   const value = await read(dataStore, (store) => store.get(id));
   if (value === undefined) return null;
   const record = validatePackDocument(value);
@@ -103,6 +112,9 @@ export async function writePack({
   expectedRevision = 0,
   remove = false,
 }) {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop)
+    return desktop.savePack({ id, config, baseline, expectedRevision, remove });
   if (
     !validPackId(id) ||
     !Number.isSafeInteger(expectedRevision) ||

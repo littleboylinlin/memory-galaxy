@@ -6,13 +6,13 @@ async function checkDirectory(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = directory + "/" + entry.name;
     if (entry.isDirectory()) await checkDirectory(path);
-    else if (entry.name.endsWith(".mjs"))
+    else if (/\.(mjs|cjs)$/.test(entry.name))
       execFileSync(process.execPath, ["--check", path], { stdio: "inherit" });
     else if (entry.name.endsWith(".json"))
       JSON.parse(await readFile(path, "utf8"));
   }
 }
-for (const directory of ["web", "protocol", "scripts", "tests"])
+for (const directory of ["web", "protocol", "scripts", "tests", "desktop"])
   await checkDirectory(directory);
 for (const path of ["index.html", "web/index.html"]) {
   const html = await readFile(path, "utf8");
@@ -35,6 +35,7 @@ for (const file of [
   "app.mjs",
   "import-ui.mjs",
   "backup-ui.mjs",
+  "desktop-ui.mjs",
   "insights-ui.mjs",
   "topic-pack-ui.mjs",
 ]) {

@@ -1,0 +1,21 @@
+appId: com.littleboylinlin.memorygalaxy
+productName: Memory Galaxy
+directories:
+  output: release
+files:
+  - desktop/*.mjs
+  - desktop/preload.cjs
+  - desktop/icon.ico
+  - web/**/*
+  - protocol/**/*
+  - LICENSE
+win:
+  target: nsis
+  executableName: MemoryGalaxy
+  icon: desktop/icon.ico
+  artifactName: MemoryGalaxy-Setup-${version}-${arch}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  runAfterFinish: false
+  deleteAppDataOnUninstall: false

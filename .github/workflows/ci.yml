@@ -168,3 +168,59 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  desktop:
+    name: Build and install Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 25
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:storage
+      - run: npm run desktop:pack
+      - name: Install and exercise the packaged executable without external network access
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem -Path release -Filter 'MemoryGalaxy-Setup-*-x64.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer missing' }
+          $destination = Join-Path $env:RUNNER_TEMP 'memory-galaxy-install'
+          $addresses = @('0.0.0.0-126.255.255.255', '128.0.0.0-255.255.255.255', '::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')
+          $installerRule = New-NetFirewallRule -DisplayName 'Memory Galaxy installer offline' -Program $installer.FullName -Direction Outbound -Action Block -RemoteAddress $addresses
+          try {
+            $setup = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
+            if ($setup.ExitCode -ne 0) { throw "Installer exited with $($setup.ExitCode)" }
+            $exe = Join-Path $destination 'MemoryGalaxy.exe'
+            if (-not (Test-Path $exe -PathType Leaf)) { throw 'Installed executable missing' }
+            $appRule = New-NetFirewallRule -DisplayName 'Memory Galaxy app offline' -Program $exe -Direction Outbound -Action Block -RemoteAddress $addresses
+            try {
+              $env:MEMORY_GALAXY_INSTALLED_EXE = $exe
+              npm run test:desktop
+              if ($LASTEXITCODE -ne 0) { throw "Native acceptance failed ($LASTEXITCODE)" }
+            } finally {
+              Remove-NetFirewallRule -Name $appRule.Name
+            }
+          } finally {
+            Remove-NetFirewallRule -Name $installerRule.Name
+          }
+          $sha = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
+          Set-Content -Path ($installer.FullName + '.sha256') -Value "$sha  $($installer.Name)" -Encoding utf8
+          Set-Content -Path release/desktop-revision.txt -Value $env:GITHUB_SHA -Encoding utf8
+      - name: Preserve verified installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-x64-installer
+          path: |
+            release/MemoryGalaxy-Setup-*-x64.exe
+            release/MemoryGalaxy-Setup-*-x64.exe.sha256
+            release/desktop-revision.txt
+          if-no-files-found: error
+          retention-days: 14
