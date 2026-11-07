@@ -63,10 +63,13 @@ export async function close(app) {
   assert.equal(code, 0);
 }
 
-export async function choose(app, { open, save, directory = false }) {
+export async function choose(
+  app,
+  { open, save, directory = false, extension = "json" },
+) {
   // Substitute the platform dialog result while checking the actual IPC arguments and file I/O.
   await app.evaluate(
-    ({ dialog, BrowserWindow }, { open, save, directory }) => {
+    ({ dialog, BrowserWindow }, { open, save, directory, extension }) => {
       if (open)
         dialog.showOpenDialog = async (parent, options) => {
           if (
@@ -76,7 +79,7 @@ export async function choose(app, { open, save, directory = false }) {
             ) ||
             (!directory &&
               !options.filters.some((filter) =>
-                filter.extensions.includes("json"),
+                filter.extensions.includes(extension),
               ))
           )
             throw new Error("Incorrect native open-dialog options");
@@ -86,9 +89,9 @@ export async function choose(app, { open, save, directory = false }) {
         dialog.showSaveDialog = async (parent, options) => {
           if (
             !(parent instanceof BrowserWindow) ||
-            !options.defaultPath.endsWith(".json") ||
+            !options.defaultPath.endsWith("." + extension) ||
             !options.filters.some((filter) =>
-              filter.extensions.includes("json"),
+              filter.extensions.includes(extension),
             )
           )
             throw new Error("Incorrect native save-dialog options");
@@ -99,6 +102,6 @@ export async function choose(app, { open, save, directory = false }) {
         checkboxChecked: false,
       });
     },
-    { open, save, directory },
+    { open, save, directory, extension },
   );
 }

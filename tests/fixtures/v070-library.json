@@ -1,0 +1,175 @@
+{
+  "format": "memory-galaxy/library-backup/1",
+  "sha256": "237f1a681d8997138040a208a17079b04cccb030a00fa257e8f33e315de0112a",
+  "payload": {
+    "created_at": "2026-01-01T00:00:00.000Z",
+    "state": {
+      "workspace": {
+        "format": "memory-galaxy/backup/1",
+        "created_at": "2026-01-01T00:00:00.000Z",
+        "graph": {
+          "protocol": "mgp/1.1",
+          "source": {
+            "id": "test:desktop",
+            "platform": "manual",
+            "completeness": "partial"
+          },
+          "nodes": [
+            {
+              "id": "memory:original",
+              "label": "迁移测试记忆",
+              "type": "memory",
+              "content": "测试原文与出处",
+              "source_ref": "fixture:page-1",
+              "state": "confirmed",
+              "updated_at": "2001-01-01T00:00:00Z"
+            },
+            {
+              "id": "memory:second",
+              "label": "另一条测试记忆",
+              "type": "memory"
+            }
+          ],
+          "edges": [
+            {
+              "id": "link:original",
+              "from": "memory:original",
+              "to": "memory:second",
+              "type": "documents",
+              "basis": "explicit",
+              "evidence": "测试关系依据",
+              "source_ref": "fixture:edge"
+            }
+          ]
+        },
+        "demo": false,
+        "snapshots": [
+          {
+            "id": "local:snapshot:7eaae9e4b04e61f66cb228627fea7557",
+            "label": "已命名快照",
+            "created_at": "2026-01-01T00:00:00.000Z",
+            "kind": "manual",
+            "graph": {
+              "protocol": "mgp/1.1",
+              "source": {
+                "id": "test:desktop",
+                "platform": "manual",
+                "completeness": "partial"
+              },
+              "nodes": [
+                {
+                  "id": "memory:original",
+                  "label": "迁移测试记忆",
+                  "type": "memory",
+                  "content": "测试原文与出处",
+                  "source_ref": "fixture:page-1",
+                  "state": "confirmed",
+                  "updated_at": "2001-01-01T00:00:00Z"
+                },
+                {
+                  "id": "memory:second",
+                  "label": "另一条测试记忆",
+                  "type": "memory"
+                }
+              ],
+              "edges": [
+                {
+                  "id": "link:original",
+                  "from": "memory:original",
+                  "to": "memory:second",
+                  "type": "documents",
+                  "basis": "explicit",
+                  "evidence": "测试关系依据",
+                  "source_ref": "fixture:edge"
+                }
+              ]
+            }
+          }
+        ],
+        "events": [],
+        "view": {
+          "clusterBy": "type",
+          "showLabels": true,
+          "animate": true,
+          "positions": []
+        }
+      },
+      "tab": {
+        "version": 1,
+        "view": "review",
+        "query": "测试",
+        "typeFilter": "all",
+        "stateFilter": "all",
+        "listPage": 0,
+        "timelinePage": 0,
+        "edgePage": 0,
+        "timelineMode": "memory",
+        "selected": "memory:original",
+        "camera": null
+      },
+      "reviews": [
+        {
+          "schema": 1,
+          "id": "memory:original",
+          "favorite": true,
+          "reviewed": {
+            "at": "2026-01-01T00:00:00.000Z",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ],
+      "packs": [
+        {
+          "schema": 1,
+          "id": "pack:test",
+          "revision": 1,
+          "saved_at": "2026-01-01T00:00:00.000Z",
+          "config": {
+            "title": "本地主题包",
+            "rules": {
+              "keyword": "",
+              "tag": "",
+              "type": "all",
+              "state": "all",
+              "related": 0
+            },
+            "includeIds": [],
+            "excludeIds": []
+          },
+          "baseline": {
+            "nodes": [
+              {
+                "id": "memory:original",
+                "hash": "436053358c573eea0e4666b7fcbc47c66eafab909bb7ee622870e67abb5023b6"
+              },
+              {
+                "id": "memory:second",
+                "hash": "92ae188a710ba810708aebd5f52e0f038c9f873da3e1fc3bde7742f2859be6bc"
+              }
+            ],
+            "edges": [
+              {
+                "id": "id:link:original",
+                "hash": "0e9c75a6a57552e2296a66d4ff4cae6f167c3845ac9fabc069673f2f0033f1bd"
+              }
+            ],
+            "sources": [
+              {
+                "id": "test:desktop",
+                "hash": "ddae662473c908650cac585eb6109496993317f5cd22875ee1ae356d5a171ebe"
+              }
+            ],
+            "defaultSourceId": "test:desktop"
+          }
+        },
+        {
+          "schema": 1,
+          "id": "pack:removed",
+          "revision": 2,
+          "saved_at": "2026-01-01T00:00:00.000Z",
+          "deleted": true
+        }
+      ]
+    }
+  }
+}

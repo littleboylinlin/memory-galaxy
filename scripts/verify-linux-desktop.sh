@@ -6,9 +6,17 @@ deb=$(realpath "release/MemoryGalaxy-$version-linux-amd64.deb")
 appimage=$(realpath "release/MemoryGalaxy-$version-linux-x86_64.AppImage")
 stage=$(mktemp -d)
 trap 'rm -rf -- "$stage"' EXIT
-mkdir -p "$stage/config"
+mkdir -p "$stage/config" "$stage/full-disk"
 cp "$appimage" "$stage/Memory Galaxy.AppImage"
 chmod +x "$stage/Memory Galaxy.AppImage"
+
+# Fill a dedicated 2 MiB filesystem inside a private mount namespace.
+sudo unshare --mount --propagation private -- bash -euc '
+  directory=$1 user=$2 uid=$3 gid=$4 node_path=$5
+  mount -t tmpfs -o "size=2m,mode=0700,uid=$uid,gid=$gid" tmpfs "$directory"
+  sudo -u "$user" -- env "MEMORY_GALAXY_FULL_DISK_DIRECTORY=$directory" \
+    "$node_path" --test --test-name-pattern "bounded disk mount" tests/desktop/storage.test.mjs
+' bash "$stage/full-disk" "$(id -un)" "$(id -u)" "$(id -g)" "$(command -v node)"
 
 test "$(dpkg-deb -f "$deb" Architecture)" = amd64
 mkdir -p "$stage/archives"

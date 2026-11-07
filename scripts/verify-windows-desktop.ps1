@@ -19,15 +19,15 @@ function Install-Desktop([string]$Package) {
     }
 }
 
-$previous = Join-Path $env:RUNNER_TEMP 'MemoryGalaxy-Setup-0.6.0-x64.exe'
-Invoke-WebRequest -Uri 'https://github.com/littleboylinlin/memory-galaxy/releases/download/v0.6.0/MemoryGalaxy-Setup-0.6.0-x64.exe' -OutFile $previous
-if ((Get-FileHash -Algorithm SHA256 $previous).Hash.ToLowerInvariant() -ne 'e4abe6fab9012f9d6ee0111e8f31d118512832e317fe80aa4a49c581ba2db24c') {
-    throw '0.6.0 installer checksum mismatch'
+$previous = Join-Path $env:RUNNER_TEMP 'MemoryGalaxy-Setup-0.7.0-x64.exe'
+Invoke-WebRequest -Uri 'https://github.com/littleboylinlin/memory-galaxy/releases/download/v0.7.0/MemoryGalaxy-Setup-0.7.0-x64.exe' -OutFile $previous
+if ((Get-FileHash -Algorithm SHA256 $previous).Hash.ToLowerInvariant() -ne '2147cd408f81b213b773b73d11ecdebc76bf1a902fbb48f138360fe3dbe67616') {
+    throw '0.7.0 installer checksum mismatch'
 }
 Install-Desktop $previous
 
 $exe = Join-Path $destination 'MemoryGalaxy.exe'
-if (-not (Test-Path $exe -PathType Leaf)) { throw '0.6.0 installation is missing its executable' }
+if (-not (Test-Path $exe -PathType Leaf)) { throw '0.7.0 installation is missing its executable' }
 $appRule = Block-Network $exe
 try {
     $env:MEMORY_GALAXY_INSTALLED_EXE = $exe
@@ -35,15 +35,16 @@ try {
     $env:MEMORY_GALAXY_PROFILE_DIRECTORY = $profile
     $env:MEMORY_GALAXY_PROFILE_REPORT = Join-Path $env:RUNNER_TEMP 'windows-profile.json'
     $env:MEMORY_GALAXY_PROFILE_MODE = 'seed'
-    $env:MEMORY_GALAXY_PROFILE_VERSION = '0.6.0'
+    $env:MEMORY_GALAXY_PROFILE_VERSION = '0.7.0'
+    $env:MEMORY_GALAXY_V070_BACKUP = Join-Path $env:RUNNER_TEMP 'windows-0.7.0-backup.json'
     node --test tests/desktop/profile.test.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'Seeding the 0.6.0 profile failed' }
+    if ($LASTEXITCODE -ne 0) { throw 'Seeding and exporting the 0.7.0 profile failed' }
 
     Install-Desktop $installer.FullName
     $env:MEMORY_GALAXY_PROFILE_MODE = 'check'
     $env:MEMORY_GALAXY_PROFILE_VERSION = $version
     node --test tests/desktop/profile.test.mjs
-    if ($LASTEXITCODE -ne 0) { throw '0.6.0 to 0.7.0 upgrade acceptance failed' }
+    if ($LASTEXITCODE -ne 0) { throw "0.7.0 to $version upgrade acceptance failed" }
     npm run test:desktop
     if ($LASTEXITCODE -ne 0) { throw 'Windows native acceptance failed' }
 
@@ -54,7 +55,7 @@ try {
     $uninstall = Start-Process -FilePath $uninstaller[0].FullName -ArgumentList '/S' -Wait -PassThru
     if ($uninstall.ExitCode -ne 0 -or (Test-Path $exe)) { throw 'NSIS uninstall failed' }
     if ((Get-FileHash -Algorithm SHA256 $database).Hash -ne $digest) { throw 'Uninstall changed the profile database' }
-    Write-Host 'NSIS uninstall removed the application and preserved the 0.6.0 default-profile database.'
+    Write-Host 'NSIS uninstall removed the application and preserved the upgraded 0.7.0 default-profile database.'
 } finally {
     Remove-NetFirewallRule -Name $appRule.Name
 }

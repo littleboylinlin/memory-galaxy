@@ -69,6 +69,26 @@
             <h2>每颗星，都有来处。</h2>
             <p>在自己的记忆中，发现已有的联系。</p>
           </div>
+          <section
+            id="desktopWelcome"
+            class="notice"
+            aria-labelledby="desktopWelcomeTitle"
+            hidden
+          >
+            <strong id="desktopWelcomeTitle">开始整理自己的记忆</strong>
+            <p class="small">
+              先导入记忆文件，或从旧电脑和网页迁移。应用更改后会自动保存到这台设备。
+            </p>
+            <div class="actions">
+              <button class="btn" id="desktopWelcomeImport">导入文件</button>
+              <button class="btn" id="desktopWelcomeRestore">
+                迁移已有资料
+              </button>
+              <button class="text-button" id="desktopWelcomeDismiss">
+                先看看示例
+              </button>
+            </div>
+          </section>
           <label class="field-label" for="search">查找记忆</label>
           <div class="search-box">
             <span aria-hidden="true">⌕</span
@@ -178,6 +198,9 @@
               style="overflow-wrap: anywhere"
             ></p>
             <button class="btn" id="desktopFolderBtn">更换数据文件夹</button>
+            <button class="btn" id="desktopEncryptCopy">
+              创建加密资料库副本
+            </button>
           </div>
           <div class="actions">
             <button class="btn" id="backupBtn">下载完整备份</button
@@ -189,6 +212,9 @@
             </button>
             <button class="btn" id="desktopWorkspaceBackup" hidden>
               另存工作区备份
+            </button>
+            <button class="btn" id="desktopEncryptedBackup" hidden>
+              用指定密码备份
             </button>
           </div>
           <input
@@ -1141,15 +1167,65 @@
       </header>
       <div class="dialog-body">
         <p id="desktopProblemText" role="alert"></p>
-        <p>
+        <p id="desktopProblemHelp">
           请选择另一份有效资料库，或选择新的文件夹后从备份恢复。原资料库文件会保留。
         </p>
       </div>
       <footer class="dialog-footer">
-        <button class="btn primary" id="desktopRecoveryFolder">
-          选择数据文件夹
+        <button class="btn" id="desktopRetryOpen">重试打开</button>
+        <button class="btn" id="desktopRecoveryFolder">选择数据文件夹</button>
+        <button class="btn primary" id="desktopRecoveryUnlock" hidden>
+          输入密码解锁
         </button>
       </footer>
+    </dialog>
+    <dialog
+      class="editor-dialog"
+      id="desktopPasswordDialog"
+      aria-labelledby="desktopPasswordTitle"
+    >
+      <form id="desktopPasswordForm" autocomplete="off">
+        <header class="dialog-heading">
+          <h2 id="desktopPasswordTitle"></h2>
+        </header>
+        <div class="dialog-body">
+          <p id="desktopPasswordHelp"></p>
+          <label class="field-label" for="desktopPassword">密码</label>
+          <input
+            class="field"
+            type="password"
+            id="desktopPassword"
+            autocomplete="off"
+            required
+            autofocus
+          />
+          <div id="desktopConfirmPasswordRow" hidden>
+            <label class="field-label" for="desktopConfirmPassword"
+              >再次输入密码</label
+            >
+            <input
+              class="field"
+              type="password"
+              id="desktopConfirmPassword"
+              autocomplete="new-password"
+            />
+          </div>
+          <p
+            id="desktopPasswordError"
+            class="form-error"
+            role="alert"
+            hidden
+          ></p>
+        </div>
+        <footer class="dialog-footer">
+          <button class="btn" id="desktopCancelPassword" type="button">
+            取消
+          </button>
+          <button class="btn primary" id="desktopSubmitPassword" type="submit">
+            继续
+          </button>
+        </footer>
+      </form>
     </dialog>
     <script type="module" src="./app.mjs"></script>
   </body>

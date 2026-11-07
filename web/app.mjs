@@ -28,7 +28,8 @@ const desktop = globalThis.memoryGalaxyDesktop;
 import { NodePicker } from "./node-picker.mjs";
 import { InsightsUi } from "./insights-ui.mjs";
 import { TopicPackUi } from "./topic-pack-ui.mjs";
-import { matchesMemory } from "./memory-filter.mjs";
+import { createMemorySearch } from "./memory-filter.mjs";
+const searchMemories = createMemorySearch();
 const $ = (id) => document.getElementById(id);
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -75,6 +76,7 @@ let graphReference = null,
   saveTimer = null,
   saveQueue = Promise.resolve(),
   saving = 0,
+  saveFailed = false,
   viewVersion = 0,
   editingNode = null,
   editingEdge = null,
@@ -89,6 +91,7 @@ let sessionReady = false,
   sessionQueue = Promise.resolve(),
   lastSession = "",
   desktopReady = false,
+  desktopEncrypted = false,
   desktopBusy = false;
 const editorBaselines = new Map();
 function editorValue(id) {
@@ -124,18 +127,26 @@ function saveLabel() {
     ? "编辑中 · 尚未应用"
     : saving
       ? "正在保存"
-      : externalSave
-        ? "本机存储有变化"
-        : dirty
-          ? "未保存到本机"
-          : hasSaved
-            ? "已保存到本机"
-            : desktop
-              ? "本地资料库 · 就绪"
-              : "示例 · 未保存";
+      : desktop && unreadableStorage
+        ? "资料库尚未打开"
+        : externalSave
+          ? "本机存储有变化"
+          : desktop && saveFailed
+            ? "保存失败 · 可重试"
+            : dirty
+              ? "未保存到本机"
+              : hasSaved
+                ? "已保存到本机"
+                : desktop
+                  ? "本地资料库 · 就绪"
+                  : "示例 · 未保存";
   for (const id of ["saveBtn", "quickSaveBtn"]) {
-    $(id).disabled = saving > 0;
-    $(id).textContent = saving ? "正在保存…" : "保存到本机";
+    $(id).disabled = saving > 0 || Boolean(desktop && unreadableStorage);
+    $(id).textContent = saving
+      ? "正在保存…"
+      : desktop && saveFailed && !externalSave
+        ? "重试保存"
+        : "保存到本机";
   }
   $("saveStatus").dataset.state =
     hasDraft() || dirty || externalSave ? "pending" : "saved";
@@ -289,6 +300,7 @@ const packs = new TopicPackUi({
 });
 workspace.addEventListener("change", workspaceChanged);
 function workspaceChanged(event) {
+  if (desktop) $("desktopWelcome").hidden = true;
   syncGraph({ restoredView: event.detail.label === "恢复完整备份" });
   markDirty();
   notice(
@@ -336,13 +348,11 @@ function renderFilters() {
   }
 }
 function applyFilters() {
-  filtered = workspace.graph.nodes.filter((node) =>
-    matchesMemory(node, {
-      keyword: query,
-      type: typeFilter,
-      state: stateFilter,
-    }),
-  );
+  filtered = searchMemories(workspace.graph.nodes, {
+    keyword: query,
+    type: typeFilter,
+    state: stateFilter,
+  });
   sky.setFilter(new Set(filtered.map((node) => node.id)));
   const results = $("searchResults");
   results.replaceChildren();
@@ -887,6 +897,14 @@ async function persist(manual = true) {
     return;
   }
   if (externalSave) {
+    if (desktop) {
+      if (manual)
+        notice(
+          "资料库已在别处更新。请先用「另存工作区备份」保留页面中的更改，再重新打开资料库。",
+          true,
+        );
+      return;
+    }
     if (manual)
       ask(
         unreadableStorage ? "覆盖未能读取的本机工作区" : "覆盖另一页面的保存",
@@ -920,6 +938,7 @@ async function persist(manual = true) {
     backup = workspace.backup();
   } catch (error) {
     dirty = true;
+    saveFailed = true;
     saveLabel();
     notice("无法准备保存：" + error.message, true);
     return;
@@ -937,6 +956,7 @@ async function persist(manual = true) {
     });
   try {
     await saveQueue;
+    saveFailed = false;
     if (version === workspace.version && viewStamp === viewVersion)
       dirty = false;
     hasSaved = true;
@@ -953,6 +973,7 @@ async function persist(manual = true) {
       );
   } catch (error) {
     dirty = true;
+    saveFailed = true;
     if (error instanceof StorageConflictError) pauseAutosave();
     notice("保存失败，页面中的数据仍保留：" + error.message, true);
   } finally {
@@ -1287,7 +1308,14 @@ function downloadWorkspaceBackup() {
   }
 }
 $("backupBtn").onclick = downloadWorkspaceBackup;
-$("desktopWorkspaceBackup").onclick = downloadWorkspaceBackup;
+$("desktopWorkspaceBackup").onclick = () => {
+  if (!desktopEncrypted) return downloadWorkspaceBackup();
+  ask(
+    "另存明文工作区备份",
+    "此文件包含原文和来源。请选择合适的位置保管。",
+    downloadWorkspaceBackup,
+  );
+};
 
 async function flushDesktop() {
   if (!desktopReady) return;
@@ -1532,7 +1560,8 @@ async function initialize() {
   desktopReady = Boolean(desktop && !unreadableStorage);
   if (desktop) {
     autosave = desktopReady;
-    desktopUi.setStatus(desktopStatus);
+    desktopEncrypted = Boolean(desktopStatus?.encrypted);
+    desktopUi.setStatus({ ...desktopStatus, welcome: !hasSaved });
   }
   saveSession();
 }

@@ -3,7 +3,14 @@ const { contextBridge, ipcRenderer } = require("electron");
 const invoke =
   (method) =>
   (...args) =>
-    ipcRenderer.invoke("library:" + method, ...args);
+    ipcRenderer.invoke("library:" + method, ...args).catch((error) => {
+      throw new Error(
+        error.message.replace(
+          /^Error invoking remote method '[^']+': Error: /,
+          "",
+        ),
+      );
+    });
 contextBridge.exposeInMainWorld("memoryGalaxyDesktop", {
   status: invoke("status"),
   loadWorkspace: invoke("loadWorkspace"),
@@ -17,8 +24,11 @@ contextBridge.exposeInMainWorld("memoryGalaxyDesktop", {
   loadPack: invoke("loadPack"),
   savePack: invoke("savePack"),
   changeFolder: invoke("changeFolder"),
+  unlockLibrary: invoke("unlockLibrary"),
   exportBackup: invoke("exportBackup"),
   previewRestore: invoke("previewRestore"),
+  unlockBackup: invoke("unlockBackup"),
+  cancelPreview: invoke("cancelPreview"),
   restore: invoke("restore"),
   onClosing: (callback) => ipcRenderer.on("library:closing", () => callback()),
   finishClose: invoke("finishClose"),

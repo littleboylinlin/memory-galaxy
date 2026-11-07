@@ -11,14 +11,26 @@ import { setTimeout as delay } from "node:timers/promises";
 import { readFile, mkdir, realpath, lstat } from "node:fs/promises";
 import { join, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DATABASE_NAME, Library } from "./library.mjs";
+import {
+  DATABASE_NAME,
+  LibraryLocked,
+  createLibrary,
+  openLibrary,
+} from "./library.mjs";
 import {
   readFolderSetting,
   writeFolderSetting,
-  readBackupFile,
+  readBackupBytes,
   writeNewFile,
 } from "./files.mjs";
 import {
+  deriveEncryption,
+  decryptBackup,
+  ENCRYPTED_BACKUP_OVERHEAD,
+  isEncryptedBackup,
+} from "./encryption.mjs";
+import {
+  LIBRARY_FILE_BYTES,
   makeLibraryBackup,
   parseLibraryBackup,
   describeLibraryRestore,
@@ -53,6 +65,9 @@ app.commandLine.appendSwitch("disable-background-networking");
 app.commandLine.appendSwitch("disable-component-update");
 
 let window, library, folder, settingFile, problem, startupMessage, preview;
+let locked = false,
+  pendingFolder,
+  pendingBackup;
 let queue = Promise.resolve(),
   closeTimer,
   closePrompt = false,
@@ -63,9 +78,29 @@ function trusted(event) {
   return (
     window &&
     event.sender === window.webContents &&
+    frame &&
     frame === event.sender.mainFrame &&
     frame.url.split("#")[0] === entry
   );
+}
+
+function storageMessage(error) {
+  const sqlite = (error.errcode ?? 0) & 255;
+  if (["ENOSPC", "EDQUOT"].includes(error.code) || sqlite === 13)
+    return "磁盘空间或配额不足。请释放空间后重试。";
+  if (
+    ["EACCES", "EPERM", "EROFS"].includes(error.code) ||
+    sqlite === 8 ||
+    sqlite === 14
+  )
+    return "无法访问或写入该文件。请检查文件夹权限、磁盘连接及只读设置。";
+  if (sqlite === 5 || sqlite === 6)
+    return "资料库正在被另一进程使用，请稍后重试。";
+  if (sqlite === 11 || sqlite === 26)
+    return "SQLite 文件损坏或格式无法识别。请保留原文件，再选择有效资料库或备份。";
+  if (error.code === "EIO" || sqlite === 10)
+    return "磁盘读写失败。请检查磁盘连接，保留原资料后重试。";
+  return error.message;
 }
 
 function handle(method, run) {
@@ -73,7 +108,9 @@ function handle(method, run) {
     if (!trusted(event)) throw new Error("不允许此页面访问本地资料库。");
     const request = queue.then(() => run(...args));
     queue = request.catch(() => {});
-    return request;
+    return request.catch((error) => {
+      throw new Error(storageMessage(error));
+    });
   });
 }
 
@@ -91,49 +128,35 @@ async function startup() {
     const saved = await readFolderSetting(settingFile);
     if (saved) folder = saved;
     else await mkdir(folder, { recursive: true });
-    opened = new Library(join(folder, DATABASE_NAME), { create: !saved });
-    if (!saved) await writeFolderSetting(settingFile, folder);
+    const path = join(folder, DATABASE_NAME);
+    opened =
+      saved || (await exists(path))
+        ? await openLibrary(path)
+        : await createLibrary(path);
+    if (!saved && !(await writeFolderSetting(settingFile, folder)))
+      startupMessage = "已打开资料库，但系统未确认数据文件夹设置已同步到磁盘。";
     library = opened;
   } catch (error) {
     opened?.close();
-    problem = error.message;
+    locked = error instanceof LibraryLocked;
+    problem = storageMessage(error);
   }
 }
 
-async function changeFolder() {
-  const { canceled, filePaths } = await dialog.showOpenDialog(window, {
-    title: "选择本地资料库文件夹",
-    defaultPath: folder,
-    properties: ["openDirectory", "createDirectory"],
-  });
-  if (canceled) return false;
-  const selected = await realpath(filePaths[0]);
-  if (library && !relative(folder, selected)) return false;
-  const path = join(selected, DATABASE_NAME);
-  const existing = await lstat(path).catch((error) => {
-    if (error.code === "ENOENT") return null;
-    throw error;
-  });
-  const { response } = await dialog.showMessageBox(window, {
-    type: "question",
-    title: "确认切换数据文件夹",
-    message: selected,
-    detail: existing
-      ? "将打开此文件夹中已有的资料库。当前文件夹中的资料会保留。"
-      : library
-        ? "将把当前完整资料复制到此文件夹并打开。原文件夹中的资料会保留。"
-        : "将在此文件夹新建资料库。原资料文件会保留，之后可选择备份恢复。",
-    buttons: ["返回", "确认切换"],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true,
-  });
-  if (response !== 1) return false;
-  const copy = !existing && library ? library.snapshot().state : null;
-  const candidate = new Library(path, { create: !existing });
+async function exists(path) {
   try {
-    if (copy) candidate.replace(copy, 0);
-    await writeFolderSetting(settingFile, selected);
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function activateLibrary(selected, candidate) {
+  let durable;
+  try {
+    durable = await writeFolderSetting(settingFile, selected);
   } catch (error) {
     candidate.close();
     throw error;
@@ -141,48 +164,161 @@ async function changeFolder() {
   library?.close();
   library = candidate;
   folder = selected;
+  locked = false;
   problem = undefined;
-  preview = undefined;
-  startupMessage = "已打开资料库：" + folder;
-  return true;
+  preview = pendingFolder = pendingBackup = undefined;
+  startupMessage =
+    "已打开资料库：" +
+    folder +
+    (durable ? "" : "。系统未确认文件夹设置已同步到磁盘。");
+  return { changed: true };
 }
 
-const backupName = (prefix) =>
+async function changeFolder(password) {
+  pendingFolder = undefined;
+  const encryptCopy = password !== undefined;
+  if (encryptCopy) current();
+  const { canceled, filePaths } = await dialog.showOpenDialog(window, {
+    title: encryptCopy ? "为加密副本选择新的文件夹" : "选择本地资料库文件夹",
+    defaultPath: folder,
+    properties: ["openDirectory", "createDirectory"],
+  });
+  if (canceled) return null;
+  const selected = await realpath(filePaths[0]);
+  const path = join(selected, DATABASE_NAME);
+  const existing = await exists(path);
+  if (encryptCopy && existing)
+    throw new Error("此文件夹已有资料库。请选择新的文件夹创建加密副本。");
+  if (library && !relative(folder, selected)) return null;
+  const { response } = await dialog.showMessageBox(window, {
+    type: "question",
+    title: "确认切换数据文件夹",
+    message: selected,
+    detail: encryptCopy
+      ? "完整资料将复制到加密库。原资料库保持原样，请自行保管。"
+      : existing
+        ? "将打开此文件夹中已有的资料库。当前文件夹中的资料会保留。"
+        : library
+          ? "将把当前完整资料复制到此文件夹并打开。原文件夹中的资料会保留。"
+          : "将在此文件夹新建资料库。原资料文件会保留，之后可选择备份恢复。",
+    buttons: ["返回", "确认切换"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  if (response !== 1) return null;
+  if (existing) {
+    let candidate;
+    try {
+      candidate = await openLibrary(path);
+    } catch (error) {
+      if (!(error instanceof LibraryLocked)) throw error;
+      pendingFolder = selected;
+      return { unlock: true };
+    }
+    return activateLibrary(selected, candidate);
+  }
+  const encryption = encryptCopy ? await deriveEncryption(password) : undefined;
+  try {
+    const candidate = await createLibrary(
+      path,
+      library?.snapshot().state,
+      encryption ?? library?.encryption,
+    );
+    return await activateLibrary(selected, candidate);
+  } finally {
+    encryption?.dispose();
+  }
+}
+
+async function unlockLibrary(password) {
+  const selected = pendingFolder ?? (locked ? folder : null);
+  if (!selected) throw new Error("没有等待解锁的资料库。");
+  const candidate = await openLibrary(join(selected, DATABASE_NAME), password);
+  if (!candidate.encryption) {
+    candidate.close();
+    throw new Error("资料库文件在解锁前发生变化，请重新选择。");
+  }
+  return activateLibrary(selected, candidate);
+}
+
+const backupName = (prefix, encrypted) =>
   "memory-galaxy-" +
   prefix +
   "-" +
   new Date().toISOString().replace(/[:.]/g, "-") +
-  ".json";
+  (encrypted ? ".mgbackup" : ".json");
 
-async function exportBackup() {
+async function saveBackup(path, state, encryption) {
+  const text = await makeLibraryBackup(state);
+  await writeNewFile(path, encryption ? encryption.sealBackup(text) : text);
+}
+
+async function exportBackup(password) {
+  const store = current();
+  const encrypted = Boolean(store.encryption) || password !== undefined;
+  const extension = encrypted ? "mgbackup" : "json";
   const { canceled, filePath } = await dialog.showSaveDialog(window, {
-    title: "保存完整资料备份",
-    defaultPath: join(app.getPath("documents"), backupName("backup")),
-    filters: [{ name: "JSON 备份", extensions: ["json"] }],
+    title: encrypted ? "保存加密的完整资料备份" : "保存完整资料备份",
+    defaultPath: join(
+      app.getPath("documents"),
+      backupName("backup", encrypted),
+    ),
+    filters: [
+      { name: encrypted ? "加密备份" : "JSON 备份", extensions: [extension] },
+    ],
   });
   if (canceled) return null;
+  const encryption =
+    password === undefined ? undefined : await deriveEncryption(password);
   try {
-    await writeNewFile(
+    await saveBackup(
       filePath,
-      await makeLibraryBackup(current().snapshot().state),
+      store.snapshot().state,
+      encryption ?? store.encryption,
     );
   } catch (error) {
     if (error.code === "EEXIST")
       throw new Error("该文件已存在，请选择新文件名。");
     throw error;
+  } finally {
+    encryption?.dispose();
   }
   return filePath;
 }
 
 async function previewRestore() {
-  preview = undefined;
+  preview = pendingBackup = undefined;
   const { canceled, filePaths } = await dialog.showOpenDialog(window, {
     title: "选择完整资料备份或网页迁移包",
-    filters: [{ name: "JSON 备份", extensions: ["json"] }],
+    filters: [{ name: "资料备份", extensions: ["json", "mgbackup"] }],
     properties: ["openFile"],
   });
   if (canceled) return null;
-  const parsed = await parseLibraryBackup(await readBackupFile(filePaths[0]));
+  const bytes = await readBackupBytes(
+    filePaths[0],
+    LIBRARY_FILE_BYTES + ENCRYPTED_BACKUP_OVERHEAD,
+  );
+  if (isEncryptedBackup(bytes)) {
+    pendingBackup = filePaths[0];
+    return { encrypted: true };
+  }
+  return previewBackup(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+}
+
+async function unlockBackup(password) {
+  if (!pendingBackup) throw new Error("请重新选择加密备份。");
+  const bytes = await readBackupBytes(
+    pendingBackup,
+    LIBRARY_FILE_BYTES + ENCRYPTED_BACKUP_OVERHEAD,
+  );
+  const result = await previewBackup(await decryptBackup(bytes, password));
+  pendingBackup = undefined;
+  return result;
+}
+
+async function previewBackup(text) {
+  const parsed = await parseLibraryBackup(text);
   const { generation, state } = current().snapshot();
   const next =
     parsed.kind === "library"
@@ -215,8 +351,11 @@ async function restore(token) {
     state.packs.length ||
     state.tab
   ) {
-    safetyPath = join(folder, backupName("before-restore-" + randomUUID()));
-    await writeNewFile(safetyPath, await makeLibraryBackup(state));
+    safetyPath = join(
+      folder,
+      backupName("before-restore-" + randomUUID(), store.encryption),
+    );
+    await saveBackup(safetyPath, state, store.encryption);
   }
   store.replace(next, generation);
   startupMessage = safetyPath
@@ -255,7 +394,13 @@ async function finishClose(reason) {
 
 function wire() {
   handle("status", () => {
-    const result = { folder, error: problem, message: startupMessage };
+    const result = {
+      folder,
+      error: problem,
+      message: startupMessage,
+      locked,
+      encrypted: Boolean(library?.encryption),
+    };
     startupMessage = undefined;
     return result;
   });
@@ -272,8 +417,13 @@ function wire() {
   handle("loadPack", (id) => current().pack(id));
   handle("savePack", (value) => current().savePack(value));
   handle("changeFolder", changeFolder);
+  handle("unlockLibrary", unlockLibrary);
   handle("exportBackup", exportBackup);
   handle("previewRestore", previewRestore);
+  handle("unlockBackup", unlockBackup);
+  handle("cancelPreview", () => {
+    preview = pendingFolder = pendingBackup = undefined;
+  });
   handle("restore", restore);
   ipcMain.handle("library:finishClose", (event, reason) => {
     if (!trusted(event)) throw new Error("关闭请求来自未知页面。");
@@ -332,6 +482,9 @@ function createWindow() {
     minHeight: 570,
     backgroundColor: "#080b17",
     title: "Memory Galaxy",
+    ...(process.platform === "linux"
+      ? { icon: join(root, "desktop", "icon.png") }
+      : {}),
     webPreferences: {
       preload: fileURLToPath(new URL("./preload.cjs", import.meta.url)),
       nodeIntegration: false,

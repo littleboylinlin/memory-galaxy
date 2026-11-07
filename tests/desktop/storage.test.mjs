@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -9,6 +18,9 @@ import { test } from "node:test";
 import {
   Library,
   LibraryConflict,
+  LibraryLocked,
+  createLibrary,
+  openLibrary,
   DATABASE_NAME,
 } from "../../desktop/library.mjs";
 import {
@@ -22,6 +34,11 @@ import {
   writeFolderSetting,
   writeNewFile,
 } from "../../desktop/files.mjs";
+import {
+  decryptBackup,
+  deriveEncryption,
+  isEncryptedBackup,
+} from "../../desktop/encryption.mjs";
 import { graph, libraryFixture } from "../fixtures/desktop.mjs";
 import { Workspace } from "../../web/workspace.mjs";
 
@@ -226,3 +243,225 @@ test("damaged and missing databases fail closed; files and backup targets are pr
   });
   assert.equal(await readBackupFile(backup), "original");
 });
+
+test("failed and competing migrations never publish a partial or replacement database", async (t) => {
+  const dir = await directory(t);
+  const path = join(dir, DATABASE_NAME);
+  const state = await libraryFixture();
+  await assert.rejects(
+    () => createLibrary(path, { ...state, packs: null }),
+    /数组/,
+  );
+  assert.deepEqual(await readdir(dir), []);
+  const [first, second] = await Promise.allSettled([
+    createLibrary(path, state),
+    createLibrary(path),
+  ]);
+  const results = [first, second];
+  assert.equal(
+    results.filter(({ status }) => status === "fulfilled").length,
+    1,
+  );
+  for (const result of results) {
+    if (result.status === "fulfilled") result.value.close();
+    else assert.equal(result.reason.code, "EEXIST");
+  }
+  const bytes = await readFile(path);
+  await assert.rejects(() => createLibrary(path, state), { code: "EEXIST" });
+  assert.deepEqual(await readFile(path), bytes);
+  const missing = join(dir, "missing.sqlite3");
+  await writeFile(missing + "-journal", "orphan");
+  await assert.rejects(() => createLibrary(missing), /SQLite 日志/);
+  assert.equal(await readFile(missing + "-journal", "utf8"), "orphan");
+  await assert.rejects(() => stat(missing), { code: "ENOENT" });
+});
+
+test(
+  "a killed staging writer never exposes incomplete backup bytes at the destination",
+  { timeout: 15000 },
+  async (t) => {
+    const dir = await directory(t);
+    const path = join(dir, "backup.json");
+    const filesModule = new URL("../../desktop/files.mjs", import.meta.url)
+      .href;
+    const writer = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `
+    import { writeFile } from "node:fs/promises";
+    import { stageFile, publishNewFile } from ${JSON.stringify(filesModule)};
+    await stageFile(process.argv[1], async (temporary) => {
+      await writeFile(temporary, "partial");
+      console.log("staged");
+      await new Promise(() => setInterval(() => {}, 1000));
+    }, publishNewFile);
+  `,
+        path,
+      ],
+      { stdio: ["ignore", "pipe", "inherit"] },
+    );
+    const exit = once(writer, "exit");
+    t.after(() => writer.kill());
+    const [signal] = await Promise.race([
+      once(writer.stdout, "data"),
+      exit.then(() => assert.fail("Writer exited early")),
+    ]);
+    assert.match(signal.toString(), /staged/);
+    writer.kill("SIGKILL");
+    await exit;
+    await assert.rejects(() => stat(path), { code: "ENOENT" });
+    await writeNewFile(path, "complete");
+    assert.equal(await readBackupFile(path), "complete");
+  },
+);
+
+test(
+  "permission errors leave the last backup and SQLite database intact",
+  {
+    skip:
+      process.platform === "win32" || process.getuid?.() === 0
+        ? "requires unprivileged POSIX file permissions"
+        : false,
+  },
+  async (t) => {
+    const dir = await directory(t);
+    const readOnly = join(dir, "read-only");
+    await mkdir(readOnly);
+    const path = join(readOnly, DATABASE_NAME);
+    const library = await createLibrary(path, await libraryFixture());
+    const prior = library.snapshot();
+    const backup = join(readOnly, "complete.json");
+    await writeNewFile(backup, await makeLibraryBackup(prior.state));
+    const bytes = await readFile(backup);
+    try {
+      await chmod(readOnly, 0o500);
+      await assert.rejects(() => writeNewFile(backup, "replacement"), {
+        code: "EACCES",
+      });
+      assert.throws(
+        () => library.replace(prior.state, prior.generation),
+        /readonly|disk|open/i,
+      );
+      assert.deepEqual(library.snapshot(), prior);
+      assert.deepEqual(await readFile(backup), bytes);
+    } finally {
+      await chmod(readOnly, 0o700);
+      library.close();
+    }
+  },
+);
+
+test("encrypted copy retains the old plaintext library and requires authentication on reopen", async (t) => {
+  const dir = await directory(t);
+  const originalPath = join(dir, "original.sqlite3");
+  const path = join(dir, "encrypted.sqlite3");
+  const original = await createLibrary(originalPath, await libraryFixture());
+  const { state } = original.snapshot();
+  original.close();
+  const before = await readFile(originalPath);
+  const password = "example test password only";
+  const key = await deriveEncryption(password);
+  try {
+    const encrypted = await createLibrary(path, state, key);
+    assert.deepEqual(encrypted.snapshot().state, state);
+    assert.deepEqual(encrypted.reviews(["memory:original"]), state.reviews);
+    assert.deepEqual(
+      encrypted.pack("pack:test"),
+      state.packs.find((row) => row.id === "pack:test"),
+    );
+    encrypted.close();
+  } finally {
+    key.dispose();
+  }
+  const bytes = await readFile(path);
+  for (const text of [
+    password,
+    "测试原文",
+    "memory:original",
+    "fixture:page-1",
+    "pack:test",
+  ])
+    assert.ok(!bytes.includes(Buffer.from(text)), text);
+  await assert.rejects(() => openLibrary(path), LibraryLocked);
+  await assert.rejects(
+    () => openLibrary(path, "incorrect test password"),
+    /密码不正确/,
+  );
+  assert.deepEqual(await readFile(path), bytes);
+  assert.deepEqual(await readFile(originalPath), before);
+  const reopened = await openLibrary(path, password);
+  try {
+    assert.deepEqual(reopened.snapshot().state, state);
+    const revision = reopened.get("workspace").revision;
+    const next = reopened.saveWorkspace(state.workspace, revision);
+    assert.notEqual(next, revision);
+    assert.throws(
+      () => reopened.saveWorkspace(state.workspace, revision),
+      LibraryConflict,
+    );
+  } finally {
+    reopened.close();
+  }
+});
+
+test("encrypted backups authenticate bytes and restore the existing JSON payload", async () => {
+  const password = "another test password only";
+  const key = await deriveEncryption(password);
+  const state = await libraryFixture();
+  const json = await makeLibraryBackup(state);
+  let bytes;
+  try {
+    bytes = key.sealBackup(json);
+    assert.notDeepEqual(key.sealBackup(json), bytes);
+  } finally {
+    key.dispose();
+  }
+  assert.ok(isEncryptedBackup(bytes));
+  assert.ok(!bytes.includes(Buffer.from("测试原文")));
+  assert.equal(await decryptBackup(bytes, password), json);
+  assert.deepEqual(
+    (await parseLibraryBackup(await decryptBackup(bytes, password))).state,
+    state,
+  );
+  await assert.rejects(
+    () => decryptBackup(bytes, "incorrect test password"),
+    /密码不正确/,
+  );
+  bytes[bytes.length - 1] ^= 1;
+  await assert.rejects(() => decryptBackup(bytes, password), /加密数据已损坏/);
+});
+
+const fullDisk = process.env.MEMORY_GALAXY_FULL_DISK_DIRECTORY;
+if (fullDisk)
+  test("bounded disk mount returns ENOSPC without replacing committed data", async () => {
+    const path = join(fullDisk, DATABASE_NAME);
+    const library = await createLibrary(path, await libraryFixture());
+    try {
+      const before = library.snapshot();
+      const previous = join(fullDisk, "previous.json");
+      const text = await makeLibraryBackup(before.state);
+      await writeNewFile(previous, text);
+      const next = join(fullDisk, "next.json");
+      await assert.rejects(
+        () => writeNewFile(next, Buffer.alloc(4 * 1024 ** 2)),
+        { code: "ENOSPC" },
+      );
+      await assert.rejects(() => stat(next), { code: "ENOENT" });
+      const filler = join(fullDisk, "fill");
+      await assert.rejects(
+        () => writeFile(filler, Buffer.alloc(4 * 1024 ** 2), { flag: "wx" }),
+        { code: "ENOSPC" },
+      );
+      assert.throws(
+        () => library.replace(before.state, before.generation),
+        /full|disk|open/i,
+      );
+      await rm(filler);
+      assert.deepEqual(library.snapshot(), before);
+      assert.equal(await readBackupFile(previous), text);
+    } finally {
+      library.close();
+    }
+  });

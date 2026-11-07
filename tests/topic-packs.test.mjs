@@ -13,7 +13,7 @@ import {
   packHash,
 } from "../web/topic-packs.mjs";
 import { validatePackDocument } from "../web/topic-pack-store.mjs";
-import { matchesMemory } from "../web/memory-filter.mjs";
+import { createMemorySearch, memoryMatcher } from "../web/memory-filter.mjs";
 import { tabState } from "../web/tab-state.mjs";
 import { edgeKey, validateMgp, stringifyMgp } from "../web/mgp.mjs";
 const graph = () => ({
@@ -83,13 +83,19 @@ const frozen = (value) => {
 };
 test("shared search preserves ID, body, tag and state filtering semantics", () => {
   const n = graph().nodes[0];
-  assert(matchesMemory(n, { keyword: "保留原文" }));
-  assert(matchesMemory(n, { keyword: "A" }));
-  assert(matchesMemory(n, { keyword: "旧" }));
-  assert(!matchesMemory(n, { tag: "算" }));
-  assert(matchesMemory(n, { tag: "算法", type: "memory", state: "inferred" }));
-  assert(!matchesMemory(n, { state: "confirmed" }));
-  assert(matchesMemory(graph().nodes[2], { state: "unknown" }));
+  assert(memoryMatcher({ keyword: "保留原文" })(n));
+  assert(memoryMatcher({ keyword: "A" })(n));
+  assert(memoryMatcher({ keyword: "旧" })(n));
+  assert(!memoryMatcher({ tag: "算" })(n));
+  assert(memoryMatcher({ tag: "算法", type: "memory", state: "inferred" })(n));
+  assert(!memoryMatcher({ state: "confirmed" })(n));
+  assert(memoryMatcher({ state: "unknown" })(graph().nodes[2]));
+  const search = createMemorySearch();
+  assert.deepEqual(search([n], { keyword: " 保留原文 " }), [n]);
+  assert.deepEqual(
+    search([{ ...n, content: "新内容" }], { keyword: "保留原文" }),
+    [],
+  );
 });
 test("topic selectors intersect exact tags, type, state and search without merging duplicate titles", () => {
   assert.deepEqual(
