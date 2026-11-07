@@ -54,18 +54,29 @@ token=$(sudo pfctl -E 2>&1 | awk '/Token *:/ { print $NF }')
 test -n "$token"
 
 offline() {
-  # The runner can sudo to root. Enter the test group as the same unprivileged user.
-  sudo -n /usr/bin/sudo -n -u "$(id -un)" -g "$group" -- env "HOME=$HOME" "PATH=$PATH" \
+  # The hosted runner permits sudo to root. Drop all elevated IDs before executing the test.
+  sudo -n /usr/bin/python3 -c '
+import os
+import sys
+
+user, uid, gid, *args = sys.argv[1:]
+os.initgroups(user, int(gid))
+os.setgid(int(gid))
+os.setuid(int(uid))
+os.execv("/usr/bin/env", ["/usr/bin/env", *args])
+' "$(id -un)" "$(id -u)" "$gid" "HOME=$HOME" "PATH=$PATH" \
     "MEMORY_GALAXY_INSTALLED_EXE=$exe" "MEMORY_GALAXY_EXPECTED_ARCH=$arch" \
     "MEMORY_GALAXY_PROFILE_DIRECTORY=$profile" "MEMORY_GALAXY_PROFILE_REPORT=$stage/profile.json" "$@"
 }
 
+test "$(offline id -u)" = "$(id -u)"
 test "$(offline id -g)" = "$gid"
 curl -4 --noproxy '*' -fsSI --max-time 12 https://api.github.com/ >/dev/null
 if offline curl -4 --noproxy '*' -fsSI --max-time 5 https://api.github.com/ >/dev/null 2>&1; then
   echo 'PF isolation check reached the external host' >&2
   exit 1
 fi
+echo "The PF test group blocked external connections while retaining the runner user ID."
 offline node --test tests/desktop/native.test.mjs
 offline MEMORY_GALAXY_PROFILE_MODE=seed node --test tests/desktop/profile.test.mjs
 
