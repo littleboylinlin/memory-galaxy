@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  stat,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -87,7 +95,9 @@ test(
   "native application runs offline and migrates committed data across profiles",
   { timeout: 180000 },
   async (t) => {
-    const dir = await mkdtemp(join(tmpdir(), "memory-galaxy-native-"));
+    const dir = await realpath(
+      await mkdtemp(join(tmpdir(), "memory-galaxy-native-")),
+    );
     const profile = join(dir, "pc-a");
     const custom = join(dir, "资料库");
     const backup = join(dir, "migration.json");

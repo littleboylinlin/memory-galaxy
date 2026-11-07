@@ -27,9 +27,17 @@ for (const file of files) {
         );
         if (Object.values(job.permissions || {}).includes("write")) {
           assert.match(job.if, /github\.ref == 'refs\/heads\/main'/);
-          assert.match(job.if, /github\.event_name != 'pull_request'/);
-          assert.equal(job.environment.name, "github-pages");
           assert.ok(job.needs);
+          if (job.permissions.contents === "write") {
+            assert.equal(name, "release");
+            assert.match(job.if, /github\.event_name == 'push'/);
+            assert.equal(job.permissions.pages, undefined);
+            assert.equal(job.permissions["id-token"], undefined);
+            assert.deepEqual(job.needs.toSorted(), ["desktop", "live"]);
+          } else {
+            assert.match(job.if, /github\.event_name != 'pull_request'/);
+            assert.equal(job.environment.name, "github-pages");
+          }
         }
         for (const step of job.steps || []) {
           if (step.uses) {

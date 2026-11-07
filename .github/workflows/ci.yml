@@ -224,3 +224,78 @@ jobs:
             release/desktop-revision.txt
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish Memory Galaxy 0.6.0
+    if: >-
+      github.repository == 'littleboylinlin/memory-galaxy' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.before == '366405231961bd7b3f9364bcaa9733244196d74d'
+    needs: [desktop, live]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Publish the tested installer and remove the merged branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/13")
+          head=$(jq -er --arg sha "$GITHUB_SHA" '
+            select(.merged and .base.ref == "main" and .merge_commit_sha == $sha and
+                   .head.ref == "feature/desktop-edition")
+            | .head.sha | select(test("^[0-9a-f]{40}$"))
+          ' <<<"$pr")
+          test "$(jq -r .version package.json)" = 0.6.0
+
+          stage=$(mktemp -d)
+          gh run download "$GITHUB_RUN_ID" --name windows-x64-installer --dir "$stage"
+          test "$(tr -d '\r\n' < "$stage/desktop-revision.txt")" = "$GITHUB_SHA"
+          name=MemoryGalaxy-Setup-0.6.0-x64.exe
+          digest=$(sha256sum "$stage/$name" | cut -d ' ' -f 1)
+          test "$(tr -d '\r\n' < "$stage/$name.sha256")" = "$digest  $name"
+
+          tag=v0.6.0
+          tag_head=$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | tail -1 | cut -f 1)
+          if [[ -n "$tag_head" ]]; then
+            test "$tag_head" = "$GITHUB_SHA"
+          fi
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            cat > "$stage/notes.md" <<NOTES
+          ## Memory Galaxy 0.6.0 · Windows x64
+
+          可离线安装和运行。记忆、关系、主题包、回顾和收藏保存在可选的本地资料库，支持完整备份及迁移。
+
+          - [安装、数据位置和网页迁移](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/DESKTOP.md)
+          - [测试范围](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/VERIFICATION-0.6.0.md)
+          - [对应提交的 Windows 安装和 Pages 验收](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
+
+          安装包未签名。SHA-256 为 \`$digest\`。
+          NOTES
+            gh release create "$tag" "$stage/$name" "$stage/$name.sha256" \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Memory Galaxy 0.6.0" --notes-file "$stage/notes.md"
+          fi
+          test "$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | tail -1 | cut -f 1)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" | jq -e \
+            --arg name "$name" --arg digest "sha256:$digest" \
+            '.draft == false and any(.assets[]; .name == $name and .digest == $digest)
+             and any(.assets[]; .name == ($name + ".sha256"))'
+
+          ref=refs/heads/feature/desktop-edition
+          actual=$(git ls-remote origin "$ref" | cut -f 1)
+          if [[ -n "$actual" ]]; then
+            test "$actual" = "$head"
+            gh auth setup-git --hostname github.com
+            git push --force-with-lease="$ref:$head" origin ":$ref"
+          fi
+          test -z "$(git ls-remote origin "$ref")"
