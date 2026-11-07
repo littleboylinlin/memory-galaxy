@@ -54,7 +54,8 @@ token=$(sudo pfctl -E 2>&1 | awk '/Token *:/ { print $NF }')
 test -n "$token"
 
 offline() {
-  sudo -u "$(id -un)" -g "$group" -- env "HOME=$HOME" "PATH=$PATH" \
+  # The runner can sudo to root. Enter the test group as the same unprivileged user.
+  sudo -n /usr/bin/sudo -n -u "$(id -un)" -g "$group" -- env "HOME=$HOME" "PATH=$PATH" \
     "MEMORY_GALAXY_INSTALLED_EXE=$exe" "MEMORY_GALAXY_EXPECTED_ARCH=$arch" \
     "MEMORY_GALAXY_PROFILE_DIRECTORY=$profile" "MEMORY_GALAXY_PROFILE_REPORT=$stage/profile.json" "$@"
 }
