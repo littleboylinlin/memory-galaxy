@@ -93,6 +93,8 @@ function openDatabase() {
   });
 }
 export async function loadReviewRecords(ids) {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop) return desktop.loadReviews(ids);
   const database = await openDatabase(),
     selected = ids ? new Set(ids) : null;
   try {
@@ -118,6 +120,8 @@ export async function loadReviewRecords(ids) {
   }
 }
 export async function saveReviewAction(action) {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop) return desktop.saveReview(action);
   const database = await openDatabase();
   try {
     return await new Promise((resolve, reject) => {
@@ -144,6 +148,8 @@ export async function saveReviewAction(action) {
   }
 }
 export async function clearReviewRecords() {
+  const desktop = globalThis.memoryGalaxyDesktop;
+  if (desktop) return desktop.clearReviews();
   const database = await openDatabase();
   try {
     await new Promise((resolve, reject) => {
