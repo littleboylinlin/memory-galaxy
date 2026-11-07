@@ -71,8 +71,10 @@ os.execv("/usr/bin/env", ["/usr/bin/env", *args])
 
 test "$(offline id -u)" = "$(id -u)"
 test "$(offline id -g)" = "$gid"
-curl -4 --noproxy '*' -fsSI --max-time 12 https://api.github.com/ >/dev/null
-if offline curl -4 --noproxy '*' -fsSI --max-time 5 https://api.github.com/ >/dev/null 2>&1; then
+# HTTP responses of any status prove connectivity, including rate-limit responses.
+probe=(curl -4 --noproxy '*' --silent --show-error --head --output /dev/null)
+"${probe[@]}" --max-time 12 https://github.com/
+if offline "${probe[@]}" --max-time 5 https://github.com/ 2>/dev/null; then
   echo 'PF isolation check reached the external host' >&2
   exit 1
 fi

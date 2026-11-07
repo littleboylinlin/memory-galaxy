@@ -271,7 +271,7 @@ jobs:
       github.repository == 'littleboylinlin/memory-galaxy' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      github.event.before == '024d97166c88fdc861d994fe41a3dc3f85ce7873'
+      github.event.before == '5ada577517821348832f2fdd113b1e217454ae13'
     needs: [desktop-windows, desktop-macos, desktop-linux, live]
     runs-on: ubuntu-24.04
     timeout-minutes: 15

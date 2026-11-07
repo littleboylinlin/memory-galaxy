@@ -13,4 +13,6 @@
 
 浏览器回归覆盖桌面和移动 Chromium、Firefox 与 WebKit。Pages 构建和上线后校验独立运行，发布作业在三平台验收和 Pages 线上检查全部成功后核对五份发行包的提交与 SHA-256。
 
+首轮主分支复验在 macOS 的联网对照步骤收到 HTTP 403。该步骤改为用传输是否连通判断外网，避免把服务端返回的状态误判为网络故障。
+
 验收使用 GitHub 托管环境。Windows 10/11 实机、实体 Mac、Linux 桌面实机、系统文件选择器的人工点选、下载后 Gatekeeper 的交互流程、AppImage 的 FUSE 挂载及两台实体设备之间的迁移属于独立验收范围。macOS 发行包只使用 ad-hoc 签名。每个版本的实际通过记录以 Release 链接的对应提交 CI 为准。
