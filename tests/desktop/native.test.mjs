@@ -10,15 +10,18 @@ import {
   realpath,
   rm,
   stat,
+  writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { expect } from "@playwright/test";
 import { start, close, choose } from "./harness.mjs";
 import { DATABASE_NAME } from "../../desktop/library.mjs";
+import { decryptBackup, isEncryptedBackup } from "../../desktop/encryption.mjs";
 import { parseLibraryBackup } from "../../web/library-backup.mjs";
-import { graph } from "../fixtures/desktop.mjs";
+import { graph, libraryFixture } from "../fixtures/desktop.mjs";
 
 async function terminate(app) {
   const child = app.process();
@@ -187,5 +190,141 @@ test(
     t.diagnostic(
       "Complete backup, cancellation, restore, and pre-restore backup verified.",
     );
+  },
+);
+
+test(
+  "installed app protects encryption, wrong passwords, and legacy backup recovery",
+  { timeout: 180000 },
+  async (t) => {
+    const dir = await realpath(
+      await mkdtemp(join(tmpdir(), "memory-galaxy-protected-")),
+    );
+    const profile = join(dir, "profile");
+    const encrypted = join(dir, "加密资料");
+    const legacy =
+      process.env.MEMORY_GALAXY_V070_BACKUP ??
+      fileURLToPath(new URL("../fixtures/v070-library.json", import.meta.url));
+    const backup = join(dir, "protected.mgbackup");
+    const password = "synthetic package password";
+    const fixture = await libraryFixture();
+    await mkdir(encrypted);
+    let { app, page } = await start(t, { profile });
+    await openTools(page);
+    await expect(page.locator("#desktopWelcome")).toBeVisible();
+    await page.evaluate(
+      (workspace) => window.memoryGalaxyDesktop.saveWorkspace(workspace, null),
+      fixture.workspace,
+    );
+    await page.reload();
+    await expect(page.locator("#nodeCount")).toHaveText("2");
+    await openTools(page);
+    const plainPath = join(profile, "library", DATABASE_NAME);
+    await choose(app, { open: encrypted, directory: true });
+    await page.locator("#desktopEncryptCopy").click();
+    await page.locator("#desktopPassword").fill(password);
+    await page.locator("#desktopConfirmPassword").fill(password);
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.locator("#desktopSubmitPassword").click(),
+    ]);
+    await expect(page.locator("#desktopPath")).toContainText("已加密");
+    assert.ok((await readFile(plainPath)).includes(Buffer.from("测试原文")));
+    const database = join(encrypted, DATABASE_NAME);
+    assert.ok(!(await readFile(database)).includes(Buffer.from("测试原文")));
+
+    await close(app);
+    ({ app, page } = await start(t, { profile }));
+    await expect(page.locator("#desktopPasswordDialog")).toBeVisible();
+    await page.locator("#desktopPassword").fill("wrong synthetic password");
+    await page.locator("#desktopSubmitPassword").click();
+    await expect(page.locator("#desktopPasswordError")).toContainText(
+      "密码不正确",
+    );
+    await page.locator("#desktopPassword").fill(password);
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.locator("#desktopSubmitPassword").click(),
+    ]);
+    await expect(page.locator("#nodeCount")).toHaveText("2");
+
+    await openTools(page);
+    await choose(app, { save: backup, extension: "mgbackup" });
+    await page.locator("#backupBtn").click();
+    await expect(page.locator("#notice")).toContainText("完整资料备份已保存");
+    const bytes = await readFile(backup);
+    assert.ok(isEncryptedBackup(bytes));
+    assert.deepEqual(
+      (await parseLibraryBackup(await decryptBackup(bytes, password))).state
+        .workspace,
+      fixture.workspace,
+    );
+    await choose(app, { open: backup, extension: "mgbackup" });
+    await page.locator("#restoreBackupBtn").click();
+    await page.locator("#desktopPassword").fill("wrong synthetic password");
+    await page.locator("#desktopSubmitPassword").click();
+    await expect(page.locator("#desktopPasswordError")).toContainText(
+      "密码不正确",
+    );
+    await page.locator("#desktopPassword").fill(password);
+    await page.locator("#desktopSubmitPassword").click();
+    await expect(page.locator("#desktopRestoreDialog")).toBeVisible();
+    await page.locator("#desktopCancelRestore").click();
+    await expect(page.locator("#nodeCount")).toHaveText("2");
+
+    const broken = join(dir, "damaged.json");
+    await writeFile(broken, '{"format":"memory-galaxy/library-backup/1"}');
+    await choose(app, { open: broken });
+    await page.locator("#restoreBackupBtn").click();
+    await expect(page.locator("#notice")).toContainText("请选择完整资料备份");
+    assert.equal(
+      (await readdir(encrypted)).filter((name) =>
+        name.includes("before-restore"),
+      ).length,
+      0,
+    );
+
+    await choose(app, { open: legacy });
+    await page.locator("#restoreBackupBtn").click();
+    await expect(page.locator("#desktopRestoreDialog")).toBeVisible();
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.locator("#desktopConfirmRestore").click(),
+    ]);
+    await expect(page.locator("#nodeCount")).toHaveText("2");
+    const safety = (await readdir(encrypted)).filter((name) =>
+      name.includes("before-restore"),
+    );
+    assert.equal(safety.length, 1);
+    assert.ok(safety[0].endsWith(".mgbackup"));
+    const rollback = await decryptBackup(
+      await readFile(join(encrypted, safety[0])),
+      password,
+    );
+    assert.deepEqual(
+      (await parseLibraryBackup(rollback)).state.workspace,
+      fixture.workspace,
+    );
+    const expected = (await parseLibraryBackup(await readFile(legacy, "utf8")))
+      .state;
+    const actual = await page.evaluate(() =>
+      window.memoryGalaxyDesktop.loadWorkspace(),
+    );
+    assert.deepEqual(actual.backup, expected.workspace);
+    await close(app);
+
+    // Recover from a corrupted selected database without rewriting it.
+    await writeFile(database, "damaged fixture database");
+    ({ app, page } = await start(t, { profile }));
+    await expect(page.locator("#desktopProblemDialog")).toBeVisible();
+    await choose(app, { open: join(profile, "library"), directory: true });
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.locator("#desktopRecoveryFolder").click(),
+    ]);
+    await expect(page.locator("#nodeCount")).toHaveText("2");
+    assert.equal(await readFile(database, "utf8"), "damaged fixture database");
+    await close(app);
+    await rm(dir, { recursive: true, force: true, maxRetries: 3 });
   },
 );

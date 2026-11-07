@@ -10,8 +10,10 @@ const revisionOf = (saved) =>
       ? saved.revision
       : "legacy";
 export class StorageConflictError extends Error {
-  constructor() {
-    super("本机存储已被其他页面更新，请先备份当前数据，再确认是否覆盖。");
+  constructor(
+    message = "本机存储已被其他页面更新，请先备份当前数据，再确认是否覆盖。",
+  ) {
+    super(message);
     this.name = "StorageConflictError";
   }
 }
@@ -117,7 +119,15 @@ export async function saveWorkspace(
   expectedRevision = null,
 ) {
   const desktop = globalThis.memoryGalaxyDesktop;
-  if (desktop) return desktop.saveWorkspace(backup, expectedRevision);
+  if (desktop) {
+    try {
+      return await desktop.saveWorkspace(backup, expectedRevision);
+    } catch (error) {
+      if (error.message.includes("资料库在预览或编辑后发生变化"))
+        throw new StorageConflictError(error.message);
+      throw error;
+    }
+  }
   validateBackup(backup);
   return writeWorkspace({ backup, autosave }, expectedRevision);
 }

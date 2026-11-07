@@ -1,6 +1,6 @@
 {
   "name": "memory-galaxy",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -20,7 +20,8 @@
     "desktop": "electron .",
     "desktop:pack": "electron-builder --publish never",
     "test:desktop": "node --test tests/desktop/native.test.mjs",
-    "test:storage": "node --test tests/desktop/storage.test.mjs"
+    "test:storage": "node --test tests/desktop/storage.test.mjs",
+    "benchmark": "node scripts/benchmark.mjs"
   },
   "engines": {
     "node": ">=22"

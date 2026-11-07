@@ -8,28 +8,59 @@ export class DesktopUi {
     this.notice = notice;
     this.restoreDialog = $("desktopRestoreDialog");
     this.problemDialog = $("desktopProblemDialog");
+    this.passwordDialog = $("desktopPasswordDialog");
     $("browserSaveControls").hidden = true;
     $("desktopControls").hidden = false;
     $("desktopWorkspaceBackup").hidden = false;
+    $("desktopEncryptedBackup").hidden = false;
     $("clearSaveBtn").hidden = true;
     $("backupBtn").textContent = "导出完整资料备份";
     $("restoreBackupBtn").textContent = "恢复备份或迁移";
-    $("backupHelp").textContent =
-      "完整备份包含图谱、快照、操作记录、视图、主题包、回顾与收藏。资料库与备份均未加密。";
+    $("desktopWelcomeImport").onclick = () => $("fileInput").click();
+    $("desktopWelcomeRestore").onclick = () => $("restoreBackupBtn").click();
+    $("desktopWelcomeDismiss").onclick = () =>
+      ($("desktopWelcome").hidden = true);
+    $("desktopRetryOpen").onclick = () => this.reload();
+    $("desktopRecoveryUnlock").onclick = () => this.promptUnlock();
     for (const id of ["desktopFolderBtn", "desktopRecoveryFolder"])
       $(id).onclick = () =>
         this.run(async () => {
-          if (await api.changeFolder()) this.reload();
+          const result = await api.changeFolder();
+          if (result?.unlock) this.promptUnlock();
+          else if (result?.changed) this.reload();
         });
-    $("backupBtn").onclick = () =>
-      this.run(async () => {
-        const path = await api.exportBackup();
-        if (path) notice("完整资料备份已保存：" + path);
-      });
+    $("desktopEncryptCopy").onclick = () =>
+      this.run(() =>
+        this.promptPassword({
+          title: "为加密资料库设置密码",
+          help: "将在新文件夹创建完整副本。请自行保管密码和旧资料库。",
+          confirm: true,
+          action: async (password) => {
+            if ((await api.changeFolder(password))?.changed) this.reload();
+          },
+        }),
+      );
+    $("backupBtn").onclick = () => this.run(() => this.exportBackup());
+    $("desktopEncryptedBackup").onclick = () =>
+      this.run(() =>
+        this.promptPassword({
+          title: "为这份备份设置密码",
+          help: "恢复备份时需要此密码。请自行保管。",
+          confirm: true,
+          action: (password) => this.exportBackup(password),
+        }),
+      );
     $("restoreBackupBtn").onclick = () =>
       this.run(async () => {
         const preview = await api.previewRestore();
-        if (preview) this.showPreview(preview);
+        if (preview?.encrypted)
+          this.promptPassword({
+            title: "解锁加密备份",
+            help: "输入导出这份备份时使用的密码。",
+            action: async (password) =>
+              this.showPreview(await api.unlockBackup(password)),
+          });
+        else if (preview) this.showPreview(preview);
       });
     $("desktopCancelRestore").onclick = () => this.restoreDialog.close();
     $("desktopConfirmRestore").onclick = () => this.restore();
@@ -38,20 +69,107 @@ export class DesktopUi {
     });
     this.restoreDialog.addEventListener("close", () => {
       this.token = null;
+      this.discardPreview();
       if (!this.reloading) this.lock(false);
     });
     this.problemDialog.addEventListener("cancel", (event) =>
       event.preventDefault(),
     );
+    $("desktopPasswordForm").onsubmit = (event) => {
+      event.preventDefault();
+      void this.submitPassword();
+    };
+    $("desktopCancelPassword").onclick = () => this.dismissPassword();
+    this.passwordDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      this.dismissPassword();
+    });
   }
 
-  setStatus({ folder, error, message }) {
-    $("desktopPath").textContent = "数据文件夹：" + (folder || "尚未打开");
+  async exportBackup(password) {
+    const path = await this.api.exportBackup(password);
+    if (path) this.notice("完整资料备份已保存：" + path);
+  }
+
+  setStatus({ folder, error, message, locked, encrypted, welcome }) {
+    $("desktopPath").textContent =
+      "数据文件夹：" + (folder || "尚未打开") + (encrypted ? " · 已加密" : "");
+    $("desktopWelcome").hidden = !welcome || Boolean(error);
+    $("backupBtn").textContent = encrypted
+      ? "导出加密完整备份"
+      : "导出完整资料备份";
+    $("desktopWorkspaceBackup").textContent = "另存工作区备份（明文）";
+    $("backupHelp").textContent = encrypted
+      ? "资料库和默认完整备份已加密。手动导出的星盘、主题包和工作区备份仍是明文文件。"
+      : "完整备份包含图谱、快照、操作记录、视图、主题包、回顾与收藏。默认资料库和备份为明文，也可以用指定密码备份。";
     if (message) this.notice(message);
     if (error) {
-      $("desktopProblemText").textContent = folder + " · " + error;
+      $("desktopProblemTitle").textContent = locked
+        ? "本地资料库已加密"
+        : "无法打开本地资料库";
+      $("desktopProblemText").textContent =
+        (folder ? folder + " · " : "") + error;
+      $("desktopProblemHelp").hidden = Boolean(locked);
+      $("desktopRecoveryUnlock").hidden = !locked;
+      $("desktopRetryOpen").hidden = Boolean(locked);
       if (!this.problemDialog.open) this.problemDialog.showModal();
+      if (locked) this.promptUnlock();
     }
+  }
+
+  promptUnlock() {
+    this.promptPassword({
+      title: "解锁本地资料库",
+      help: "输入创建加密资料库时使用的密码。",
+      action: async (password) => {
+        await this.api.unlockLibrary(password);
+        this.reload();
+      },
+    });
+  }
+
+  promptPassword({ title, help, confirm = false, action }) {
+    this.passwordAction = action;
+    $("desktopPasswordTitle").textContent = title;
+    $("desktopPasswordHelp").textContent = help;
+    $("desktopConfirmPasswordRow").hidden = !confirm;
+    $("desktopPasswordError").hidden = true;
+    this.lock(true);
+    this.passwordDialog.showModal();
+  }
+
+  discardPreview() {
+    void this.api.cancelPreview().catch(() => {});
+  }
+
+  dismissPassword() {
+    if (this.running) return;
+    $("desktopPasswordForm").reset();
+    this.passwordAction = null;
+    this.passwordDialog.close();
+    this.discardPreview();
+    this.lock(false);
+  }
+
+  async submitPassword() {
+    if (this.running || !this.passwordAction) return;
+    const password = $("desktopPassword").value;
+    const error = $("desktopPasswordError");
+    if (
+      !$("desktopConfirmPasswordRow").hidden &&
+      password !== $("desktopConfirmPassword").value
+    ) {
+      error.textContent = "两次输入的密码不同。";
+      error.hidden = false;
+      return;
+    }
+    $("desktopPasswordForm").reset();
+    error.hidden = true;
+    await this.run(async () => {
+      await this.passwordAction(password);
+      this.passwordAction = null;
+      this.passwordDialog.close();
+    });
   }
 
   async run(operation) {
@@ -59,18 +177,32 @@ export class DesktopUi {
     this.running = true;
     this.lock(true);
     $("desktopRecoveryFolder").disabled = true;
+    $("desktopSubmitPassword").disabled = $("desktopCancelPassword").disabled =
+      true;
     try {
       await this.flush();
       await operation();
     } catch (error) {
-      if (this.problemDialog.open)
+      if (this.passwordDialog.open) {
+        $("desktopPasswordError").textContent = error.message;
+        $("desktopPasswordError").hidden = false;
+        $("desktopPassword").focus();
+      } else if (this.problemDialog.open)
         $("desktopProblemText").textContent =
           "无法切换数据文件夹：" + error.message;
       else this.notice(error.message, true);
     } finally {
       this.running = false;
       $("desktopRecoveryFolder").disabled = false;
-      if (!this.restoreDialog.open && !this.reloading) this.lock(false);
+      $("desktopSubmitPassword").disabled = $(
+        "desktopCancelPassword",
+      ).disabled = false;
+      if (
+        !this.restoreDialog.open &&
+        !this.passwordDialog.open &&
+        !this.reloading
+      )
+        this.lock(false);
     }
   }
 

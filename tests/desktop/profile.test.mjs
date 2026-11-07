@@ -4,13 +4,14 @@ import { isAbsolute, join } from "node:path";
 import { test } from "node:test";
 import { DATABASE_NAME } from "../../desktop/library.mjs";
 import { libraryFixture } from "../fixtures/desktop.mjs";
-import { close, start } from "./harness.mjs";
+import { choose, close, start } from "./harness.mjs";
 
 const {
   MEMORY_GALAXY_PROFILE_MODE: mode,
   MEMORY_GALAXY_PROFILE_REPORT: report,
   MEMORY_GALAXY_PROFILE_DIRECTORY: profile,
   MEMORY_GALAXY_PROFILE_VERSION: version,
+  MEMORY_GALAXY_V070_BACKUP: backup,
 } = process.env;
 
 test(
@@ -68,6 +69,13 @@ test(
     assert.equal(actual.reviews[0].favorite, true);
     assert.ok(actual.reviews[0].reviewed);
     assert.ok(actual.packs[0].baseline.nodes.length);
+    if (mode === "seed" && backup) {
+      await choose(app, { save: backup });
+      assert.equal(
+        await page.evaluate(() => window.memoryGalaxyDesktop.exportBackup()),
+        backup,
+      );
+    }
     await close(app);
     const database = await stat(join(profile, "library", DATABASE_NAME));
     assert.ok(database.size > 0);

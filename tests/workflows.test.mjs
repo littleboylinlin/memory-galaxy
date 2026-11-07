@@ -60,7 +60,12 @@ for (const file of files) {
       const jobs = workflow.jobs;
       assert.ok(jobs.package.needs.includes("checks"));
       assert.ok(jobs.package.needs.includes("browsers"));
-      assert.equal(jobs.pages.needs, "package");
+      assert.deepEqual(jobs.pages.needs.toSorted(), [
+        "desktop-linux",
+        "desktop-macos",
+        "desktop-windows",
+        "package",
+      ]);
       assert.equal(jobs.live.needs, "pages");
       assert.ok(
         jobs.live.steps.some(

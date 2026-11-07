@@ -6,7 +6,7 @@ import {
   graphSources,
 } from "./mgp.mjs";
 import { canonical, memoryIndex, sourceIssue } from "./memory-insights.mjs";
-import { matchesMemory } from "./memory-filter.mjs";
+import { memoryMatcher } from "./memory-filter.mjs";
 export const PACK_FORMAT = "memory-galaxy/topic-pack/1";
 export const DELTA_FORMAT = "memory-galaxy/topic-pack-delta/1";
 const object = (value) =>
@@ -97,8 +97,9 @@ export function selectPack(graph, configuration) {
     index = memoryIndex(graph),
     excluded = new Set(config.excludeIds),
     selected = new Map();
+  const matches = memoryMatcher(config.rules);
   for (const node of graph.nodes)
-    if (!excluded.has(node.id) && matchesMemory(node, config.rules))
+    if (!excluded.has(node.id) && matches(node))
       selected.set(node.id, { id: node.id, kind: "filter" });
   for (const id of config.includeIds)
     if (index.nodes.has(id)) selected.set(id, { id, kind: "manual" });

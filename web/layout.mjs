@@ -145,12 +145,17 @@ export function stepLayout(state, iterations = 1) {
   for (let step = 0; step < iterations; step++) {
     const grid = new Map();
     for (let i = 0; i < n; i++) {
-      const key =
-        Math.floor(x[i] / cellSize) + "," + Math.floor(y[i] / cellSize);
-      let cell = grid.get(key);
+      const cx = Math.floor(x[i] / cellSize),
+        cy = Math.floor(y[i] / cellSize);
+      let column = grid.get(cx);
+      if (!column) {
+        column = new Map();
+        grid.set(cx, column);
+      }
+      let cell = column.get(cy);
       if (!cell) {
         cell = { x: 0, y: 0, count: 0 };
-        grid.set(key, cell);
+        column.set(cy, cell);
       }
       cell.x += x[i];
       cell.y += y[i];
@@ -165,9 +170,11 @@ export function stepLayout(state, iterations = 1) {
         cy = Math.floor(y[i] / cellSize);
       let fx = 0,
         fy = 0;
-      for (let dx = -1; dx <= 1; dx++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const column = grid.get(cx + dx);
+        if (!column) continue;
         for (let dy = -1; dy <= 1; dy++) {
-          const cell = grid.get(cx + dx + "," + (cy + dy));
+          const cell = column.get(cy + dy);
           if (!cell) continue;
           const own = dx === 0 && dy === 0 ? 1 : 0,
             count = cell.count - own;
@@ -184,6 +191,7 @@ export function stepLayout(state, iterations = 1) {
           fx += ox * force;
           fy += oy * force;
         }
+      }
       const group = groups[assignments[i]],
         gravity = groups.length > 1 ? 0.0022 : 0.0007;
       fx += (group.x - x[i]) * gravity;

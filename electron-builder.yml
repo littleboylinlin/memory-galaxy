@@ -6,6 +6,7 @@ files:
   - desktop/*.mjs
   - desktop/preload.cjs
   - desktop/icon.ico
+  - desktop/icon.png
   - web/**/*
   - protocol/**/*
   - LICENSE

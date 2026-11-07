@@ -372,15 +372,11 @@ export class Sky {
       visible = [];
     for (let i = 0; i < this.nodes.length; i++) {
       if (!this.filter[i]) continue;
-      const point = this.screen(i);
-      coordinates[i * 2] = point.x;
-      coordinates[i * 2 + 1] = point.y;
-      if (
-        point.x >= -25 &&
-        point.x <= width + 25 &&
-        point.y >= -25 &&
-        point.y <= height + 25
-      ) {
+      const x = this.positions[i * 2] * this.zoom + width / 2 + this.pan.x,
+        y = this.positions[i * 2 + 1] * this.zoom + height / 2 + this.pan.y;
+      coordinates[i * 2] = x;
+      coordinates[i * 2 + 1] = y;
+      if (x >= -25 && x <= width + 25 && y >= -25 && y <= height + 25) {
         inside[i] = 1;
         visible.push(i);
       }

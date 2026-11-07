@@ -113,7 +113,7 @@ jobs:
   pages:
     name: Deploy GitHub Pages
     if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
-    needs: package
+    needs: [package, desktop-windows, desktop-macos, desktop-linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -266,12 +266,12 @@ jobs:
           retention-days: 14
 
   release:
-    name: Publish Memory Galaxy 0.7.0
+    name: Publish Memory Galaxy 0.8.0
     if: >-
       github.repository == 'littleboylinlin/memory-galaxy' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      github.event.before == '5ada577517821348832f2fdd113b1e217454ae13'
+      github.event.before == '9b54424e43177d23a8466242670b73b1d2a77381'
     needs: [desktop-windows, desktop-macos, desktop-linux, live]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
